@@ -1,0 +1,7 @@
+ultralytics
+huggingface_hub
+opencv-python-headless
+send2trash
+tqdm
+torch
+numpy
