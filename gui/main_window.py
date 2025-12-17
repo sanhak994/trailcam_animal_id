@@ -2,6 +2,8 @@
 
 import customtkinter as ctk
 from gui.pipeline_tab import PipelineTab
+from gui.cleanup_tab import CleanupTab
+from gui.review_tab import ReviewTab
 
 
 class TrailCamApp(ctk.CTk):
@@ -14,14 +16,9 @@ class TrailCamApp(ctk.CTk):
         self.title("TrailCam Animal ID Pipeline")
         self.geometry("1000x800")
 
-        # Set appearance mode - use "dark" directly to bypass darkdetect macOS 26 bug
-        # TODO: Switch back to "system" when darkdetect supports macOS 26+
-        try:
-            ctk.set_appearance_mode("system")
-        except Exception:
-            # Fallback if darkdetect fails on newer macOS
-            ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("blue")
+        # Set modern dark appearance
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("dark-blue")
 
         # Create tab view
         self.tabview = ctk.CTkTabview(self, width=980, height=750)
@@ -29,11 +26,19 @@ class TrailCamApp(ctk.CTk):
 
         # Add tabs
         self.tabview.add("Pipeline")
-        # self.tabview.add("Review")  # TODO: Add in Phase 3
-        # self.tabview.add("Cleanup")  # TODO: Add in Phase 3
+        self.tabview.add("Cleanup")
+        self.tabview.add("Review")
 
         # Initialize tab content
         self.pipeline_tab = PipelineTab(self.tabview.tab("Pipeline"))
+        self.cleanup_tab = CleanupTab(
+            self.tabview.tab("Cleanup"),
+            clips_dir_callback=lambda: self.pipeline_tab.clips_dir_var.get()
+        )
+        self.review_tab = ReviewTab(
+            self.tabview.tab("Review"),
+            clips_dir_callback=lambda: self.pipeline_tab.clips_dir_var.get()
+        )
 
         # Status bar
         self.status_label = ctk.CTkLabel(

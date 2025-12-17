@@ -5,7 +5,10 @@ import customtkinter as ctk
 from tkinter import filedialog
 from pathlib import Path
 from gui.process_runner import ProcessRunner
-from gui.config import DEFAULT_CONFIG, WORKER_OPTIONS, FRAMES_PER_CLIP_RANGE
+from gui.config import (
+    DEFAULT_CONFIG, get_worker_options, FRAMES_PER_CLIP_RANGE,
+    TITLE_FONT, HEADING_FONT, BODY_FONT, MONO_FONT
+)
 
 
 class PipelineTab:
@@ -43,14 +46,14 @@ class PipelineTab:
         ctk.CTkLabel(
             input_frame,
             text="Pipeline Configuration",
-            font=ctk.CTkFont(size=16, weight="bold")
+            font=ctk.CTkFont(**TITLE_FONT)
         ).grid(row=0, column=0, columnspan=3, sticky="w", padx=10, pady=(10, 15))
 
         # Clips Directory
         ctk.CTkLabel(
             input_frame,
             text="Clips Directory:",
-            font=ctk.CTkFont(size=13)
+            font=ctk.CTkFont(**BODY_FONT)
         ).grid(row=1, column=0, sticky="w", padx=10, pady=5)
 
         self.clips_entry = ctk.CTkEntry(
@@ -71,7 +74,7 @@ class PipelineTab:
         ctk.CTkLabel(
             input_frame,
             text="Frames Directory:",
-            font=ctk.CTkFont(size=13)
+            font=ctk.CTkFont(**BODY_FONT)
         ).grid(row=2, column=0, sticky="w", padx=10, pady=5)
 
         self.frames_entry = ctk.CTkEntry(
@@ -92,7 +95,7 @@ class PipelineTab:
         ctk.CTkLabel(
             input_frame,
             text="Output Directory:",
-            font=ctk.CTkFont(size=13)
+            font=ctk.CTkFont(**BODY_FONT)
         ).grid(row=3, column=0, sticky="w", padx=10, pady=5)
 
         self.detection_entry = ctk.CTkEntry(
@@ -113,7 +116,7 @@ class PipelineTab:
         ctk.CTkLabel(
             input_frame,
             text="Video Extensions:",
-            font=ctk.CTkFont(size=13)
+            font=ctk.CTkFont(**BODY_FONT)
         ).grid(row=4, column=0, sticky="w", padx=10, pady=5)
 
         ctk.CTkEntry(
@@ -123,13 +126,22 @@ class PipelineTab:
         ).grid(row=4, column=1, padx=10, pady=5)
 
         # Frames per Clip
-        ctk.CTkLabel(
-            input_frame,
-            text=f"Frames per Clip: {self.frames_per_clip_var.get()}",
-            font=ctk.CTkFont(size=13)
-        ).grid(row=5, column=0, sticky="w", padx=10, pady=5)
+        frames_label_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
+        frames_label_frame.grid(row=5, column=0, sticky="w", padx=10, pady=5)
 
-        self.frames_per_clip_label = ctk.CTkLabel(input_frame, text="")
+        ctk.CTkLabel(
+            frames_label_frame,
+            text="Frames per Clip:",
+            font=ctk.CTkFont(**BODY_FONT)
+        ).pack(side="left")
+
+        self.frames_value_label = ctk.CTkLabel(
+            frames_label_frame,
+            text=str(self.frames_per_clip_var.get()),
+            font=ctk.CTkFont(**HEADING_FONT),
+            width=30  # Fixed width for up to 2 digits
+        )
+        self.frames_value_label.pack(side="left", padx=5)
 
         frames_slider = ctk.CTkSlider(
             input_frame,
@@ -147,13 +159,14 @@ class PipelineTab:
         ctk.CTkLabel(
             input_frame,
             text="Frame Workers:",
-            font=ctk.CTkFont(size=13)
+            font=ctk.CTkFont(**BODY_FONT)
         ).grid(row=6, column=0, sticky="w", padx=10, pady=5)
 
+        worker_options = get_worker_options()
         ctk.CTkOptionMenu(
             input_frame,
             variable=self.frame_workers_var,
-            values=[str(w) for w in WORKER_OPTIONS],
+            values=[str(w) for w in worker_options],
             width=200
         ).grid(row=6, column=1, sticky="w", padx=10, pady=5)
 
@@ -161,13 +174,13 @@ class PipelineTab:
         ctk.CTkLabel(
             input_frame,
             text="Classify Workers:",
-            font=ctk.CTkFont(size=13)
+            font=ctk.CTkFont(**BODY_FONT)
         ).grid(row=7, column=0, sticky="w", padx=10, pady=5)
 
         ctk.CTkOptionMenu(
             input_frame,
             variable=self.classify_workers_var,
-            values=[str(w) for w in WORKER_OPTIONS],
+            values=[str(w) for w in worker_options],
             width=200
         ).grid(row=7, column=1, sticky="w", padx=10, pady=5)
 
@@ -176,7 +189,7 @@ class PipelineTab:
             input_frame,
             text="Force re-run even if outputs exist",
             variable=self.force_var,
-            font=ctk.CTkFont(size=13)
+            font=ctk.CTkFont(**BODY_FONT)
         ).grid(row=8, column=0, columnspan=2, sticky="w", padx=10, pady=10)
 
         # Execution Frame
@@ -187,7 +200,7 @@ class PipelineTab:
         ctk.CTkLabel(
             exec_frame,
             text="Pipeline Execution",
-            font=ctk.CTkFont(size=16, weight="bold")
+            font=ctk.CTkFont(**TITLE_FONT)
         ).pack(padx=10, pady=(10, 5), anchor="w")
 
         # Button Frame
@@ -200,7 +213,7 @@ class PipelineTab:
             command=self._run_pipeline,
             width=150,
             height=40,
-            font=ctk.CTkFont(size=14, weight="bold")
+            font=ctk.CTkFont(**HEADING_FONT)
         )
         self.run_button.pack(side="left", padx=5)
 
@@ -211,7 +224,7 @@ class PipelineTab:
             width=150,
             height=40,
             state="disabled",
-            font=ctk.CTkFont(size=14, weight="bold")
+            font=ctk.CTkFont(**HEADING_FONT)
         )
         self.cancel_button.pack(side="left", padx=5)
 
@@ -224,7 +237,7 @@ class PipelineTab:
         self.step_label = ctk.CTkLabel(
             exec_frame,
             text="Ready",
-            font=ctk.CTkFont(size=13)
+            font=ctk.CTkFont(**BODY_FONT)
         )
         self.step_label.pack(padx=10, pady=(0, 10), anchor="w")
 
@@ -232,26 +245,20 @@ class PipelineTab:
         ctk.CTkLabel(
             exec_frame,
             text="Output Log:",
-            font=ctk.CTkFont(size=13, weight="bold")
+            font=ctk.CTkFont(**HEADING_FONT)
         ).pack(padx=10, pady=(10, 5), anchor="w")
 
         self.log_text = ctk.CTkTextbox(
             exec_frame,
             width=940,
             height=300,
-            font=ctk.CTkFont(family="Monaco", size=11)
+            font=ctk.CTkFont(**MONO_FONT)
         )
         self.log_text.pack(padx=10, pady=(0, 10), fill="both", expand=True)
 
     def _update_frames_label(self, value):
         """Update the frames per clip label when slider changes."""
-        # Find the label in the grid and update it
-        for widget in self.parent.winfo_children():
-            if isinstance(widget, ctk.CTkFrame):
-                for child in widget.winfo_children():
-                    if isinstance(child, ctk.CTkLabel) and "Frames per Clip:" in child.cget("text"):
-                        child.configure(text=f"Frames per Clip: {int(float(value))}")
-                        break
+        self.frames_value_label.configure(text=str(int(float(value))))
 
     def _browse_clips(self):
         """Browse for clips directory."""
@@ -315,6 +322,18 @@ class PipelineTab:
         clips_path = Path(self.clips_dir_var.get())
         if not clips_path.exists():
             self._append_log(f"Error: Clips directory does not exist: {clips_path}")
+            return
+
+        # Create output directories before running pipeline
+        frames_path = Path(self.frames_dir_var.get())
+        detection_path = Path(self.detection_dir_var.get())
+
+        try:
+            frames_path.mkdir(parents=True, exist_ok=True)
+            detection_path.mkdir(parents=True, exist_ok=True)
+            self._append_log(f"Created output directories:\n  - {frames_path}\n  - {detection_path}\n")
+        except Exception as e:
+            self._append_log(f"Error: Failed to create output directories: {e}")
             return
 
         # Build command
