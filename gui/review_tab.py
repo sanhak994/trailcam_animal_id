@@ -1,21 +1,27 @@
 """Review tab for viewing clips with animal predictions."""
 
 import csv
+import platform
+import subprocess
 from pathlib import Path
 from typing import List, Dict, Optional
 import customtkinter as ctk
 from tkinter import messagebox
 from send2trash import send2trash
 from gui.video_player import VideoPlayer
+from gui.shortcuts_help import ShortcutsHelpModal
+from gui.settings_panel import SettingsPanelModal
+from gui.cleanup_modal import CleanupModal
 from gui.config import TITLE_FONT, HEADING_FONT, BODY_FONT, PLAY_RATE_RANGE, DEFAULT_CONFIG, PAUSE_DURATION_RANGE, COLORS, SUBHEADING_FONT, SMALL_FONT
 
 
 class ReviewTab:
     """Tab for reviewing video clips with animal prediction overlays."""
 
-    def __init__(self, parent, clips_dir_callback):
+    def __init__(self, parent, clips_dir_callback, session_manager=None, preferences=None):
         self.parent = parent
         self.clips_dir_callback = clips_dir_callback
+        self.session_manager = session_manager  # Optional session manager for progress tracking
 
         self.clips: List[Dict] = []
         self.current_index: Optional[int] = None
@@ -26,14 +32,38 @@ class ReviewTab:
         self.shortcuts_enabled_globally = True  # Toggle from settings
         self.search_has_focus = False  # Track search box focus
 
+        # Apply preferences if provided, otherwise use defaults
+        if preferences:
+            play_rate = preferences.get('play_rate', DEFAULT_CONFIG['play_rate'])
+            clip_pause_seconds = preferences.get('clip_pause_seconds', DEFAULT_CONFIG['clip_pause_seconds'])
+        else:
+            play_rate = DEFAULT_CONFIG['play_rate']
+            clip_pause_seconds = DEFAULT_CONFIG['clip_pause_seconds']
+
         # Settings variables
         self.shortcuts_enabled_var = ctk.BooleanVar(value=True)
         self.auto_play_enabled_var = ctk.BooleanVar(value=True)
-        self.pause_duration_var = ctk.DoubleVar(value=DEFAULT_CONFIG['clip_pause_seconds'])
+        self.pause_duration_var = ctk.DoubleVar(value=clip_pause_seconds)
 
         # Variables for UI state
-        self.speed_var = ctk.DoubleVar(value=DEFAULT_CONFIG['play_rate'])
+        self.speed_var = ctk.DoubleVar(value=play_rate)
         self.progress_var = ctk.DoubleVar(value=0.0)
+        self.was_playing_before_settings = False  # Track video state before settings open
+
+        # Auto-hide controls state
+        self.controls_visible = True
+        self.auto_hide_timer = None
+        self.auto_hide_delay_ms = 3000  # 3 seconds
+        self.controls_placeholder = None  # Placeholder to prevent video jump
+        self.was_playing_before_menu = False  # Track video state before advanced menu open
+        self.main_frame = None  # Will be set in _create_widgets
+
+        # Mouse motion debouncing
+        self.mouse_motion_debounce_timer = None
+        self.layout_in_progress = False  # Block events during layout changes
+
+        # Resize debounce
+        self.resize_debounce_timer = None
 
         self._create_widgets()
 
@@ -42,32 +72,44 @@ class ReviewTab:
         # Main container with two-column layout
         main_frame = ctk.CTkFrame(self.parent)
         main_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        self.main_frame = main_frame  # Store reference for sidebar collapse
 
-        # Configure grid weights for video-first layout (25:75 split)
-        main_frame.grid_columnconfigure(0, weight=25, minsize=220)  # Clip list (25%)
-        main_frame.grid_columnconfigure(1, weight=75, minsize=700)  # Video area (75%)
+        # Configure grid weights for stable layout (fixed sidebar, expanding video)
+        main_frame.grid_columnconfigure(0, weight=0, minsize=220)  # Clip list (fixed 220px)
+        main_frame.grid_columnconfigure(1, weight=1, minsize=700)  # Video area (expands)
         main_frame.grid_rowconfigure(0, weight=1)
 
         # === LEFT SIDE: Clip List ===
         left_frame = ctk.CTkFrame(main_frame, fg_color=COLORS['bg_secondary'])
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 3))
+        self.left_frame = left_frame  # Store reference for sidebar collapse
 
-        ctk.CTkLabel(
+        # Configure grid layout for sidebar (fixed rows, no weight changes)
+        left_frame.grid_rowconfigure(0, weight=0)  # clips_label / edge_indicator
+        left_frame.grid_rowconfigure(1, weight=0)  # search_container
+        left_frame.grid_rowconfigure(2, weight=1)  # clip_list_frame (expandable)
+        left_frame.grid_rowconfigure(3, weight=0)  # load_button
+        left_frame.grid_columnconfigure(0, weight=1)
+
+        # Clips label
+        self.clips_label = ctk.CTkLabel(
             left_frame,
             text="Clips",
             font=ctk.CTkFont(**HEADING_FONT)
-        ).pack(padx=10, pady=(10, 5))
+        )
+        self.clips_label.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
 
         # Search entry
         search_container = ctk.CTkFrame(left_frame, fg_color=COLORS['bg_primary'])
-        search_container.pack(padx=10, pady=(5, 10), fill="x")
+        search_container.grid(row=1, column=0, padx=10, pady=(5, 10), sticky="ew")
+        self.search_container = search_container  # Store reference for collapse
 
         # Top row: search box and clear button
         search_frame = ctk.CTkFrame(search_container, fg_color=COLORS['bg_primary'])
         search_frame.pack(fill="x")
 
         self.search_var = ctk.StringVar()
-        self.search_var.trace_add("write", self._on_search_changed)
+        # Search now triggered by button/Enter, not on every keystroke
 
         self.search_entry = ctk.CTkEntry(
             search_frame,
@@ -79,13 +121,33 @@ class ReviewTab:
         )
         self.search_entry.pack(side="left", fill="x", expand=True)
 
+        # Search button
+        search_btn = ctk.CTkButton(
+            search_frame,
+            text="Search",
+            width=70,
+            command=self._on_search_changed,
+            font=ctk.CTkFont(**BODY_FONT),
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        )
+        search_btn.pack(side="left", padx=(5, 0))
+
         # Clear button
         clear_btn = ctk.CTkButton(
             search_frame,
-            text="×",
-            width=30,
+            text="Clear",
+            width=60,
             command=self._clear_search,
-            font=ctk.CTkFont(size=18, weight="bold")
+            font=ctk.CTkFont(**BODY_FONT),
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
         )
         clear_btn.pack(side="left", padx=(5, 0))
 
@@ -100,7 +162,7 @@ class ReviewTab:
         self.match_count_label.pack(fill="x", pady=(2, 0))
 
         # Bind keys
-        self.search_entry.bind("<Return>", self._jump_to_first_match)
+        self.search_entry.bind("<Return>", lambda e: self._on_search_and_jump())
         self.search_entry.bind("<Escape>", lambda e: self._clear_search())
 
         # Track focus to disable shortcuts during search
@@ -109,57 +171,202 @@ class ReviewTab:
 
         # Scrollable clip list
         self.clip_list_frame = ctk.CTkScrollableFrame(left_frame, width=220, fg_color=COLORS['bg_secondary'])
-        self.clip_list_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.clip_list_frame.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="nsew")
 
         # Bind mouse wheel events for trackpad scrolling
         self._bind_mousewheel(self.clip_list_frame)
 
-        # Load button
-        ctk.CTkButton(
+        # Load button (store reference for collapse)
+        self.load_button = ctk.CTkButton(
             left_frame,
             text="Load Clips",
             command=self._load_clips,
-            width=200
-        ).pack(padx=10, pady=(0, 10))
+            width=200,
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        )
+        self.load_button.grid(row=3, column=0, padx=10, pady=(0, 10))
 
         # === RIGHT SIDE: Video Display and Controls ===
         right_frame = ctk.CTkFrame(main_frame, fg_color=COLORS['bg_primary'])
         right_frame.grid(row=0, column=1, sticky="nsew", padx=(3, 0))
 
-        # Title
+        # Configure right_frame grid (fixed regions for stability)
+        right_frame.grid_rowconfigure(0, weight=0, minsize=60)   # Title bar (fixed)
+        right_frame.grid_rowconfigure(1, weight=1)                # Video container (expands)
+        right_frame.grid_rowconfigure(2, weight=0, minsize=30)   # Progress bar (fixed)
+        right_frame.grid_rowconfigure(3, weight=0, minsize=40)   # Info strip (fixed)
+        right_frame.grid_columnconfigure(0, weight=1)
+
+        # Title bar with settings gear icon and menu
+        title_frame = ctk.CTkFrame(right_frame, fg_color=COLORS['bg_primary'])
+        title_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+
         ctk.CTkLabel(
-            right_frame,
+            title_frame,
             text="Review Clips with Animal Predictions",
             font=ctk.CTkFont(**TITLE_FONT)
-        ).pack(padx=10, pady=(10, 5))
+        ).pack(side="left")
 
-        # Video display area - responsive sizing
-        self.video_frame = ctk.CTkFrame(
-            right_frame,
-            fg_color=COLORS['video_bg']
-        )
-        self.video_frame.pack(padx=10, pady=10, fill="both", expand=True)
+        # Settings gear icon button
+        ctk.CTkButton(
+            title_frame,
+            text="⚙",
+            width=40,
+            height=30,
+            command=self._show_settings_panel,
+            font=ctk.CTkFont(size=18),
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        ).pack(side="right", padx=(5, 0))
 
-        # Configure grid to center video
+        # Advanced menu button
+        ctk.CTkButton(
+            title_frame,
+            text="≡",
+            width=40,
+            height=30,
+            command=self._show_advanced_menu,
+            font=ctk.CTkFont(size=20),
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        ).pack(side="right")
+
+        # Video container (holds video and overlay controls)
+        video_container = ctk.CTkFrame(right_frame, fg_color=COLORS['video_bg'])
+        video_container.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        self.video_container = video_container  # Store reference
+
+        # Video frame (centered within container)
+        self.video_frame = ctk.CTkFrame(video_container, fg_color=COLORS['video_bg'])
+        self.video_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        # Configure grid to center video label
         self.video_frame.grid_rowconfigure(0, weight=1)
         self.video_frame.grid_columnconfigure(0, weight=1)
+
+        # Reserve space for 16:9 video (most trail cams) to prevent layout shift on load
+        default_width = 640
+        default_height = int(default_width / (16/9))  # ~360
 
         self.video_label = ctk.CTkLabel(
             self.video_frame,
             text="Load clips to start reviewing",
-            fg_color=COLORS['video_bg']
+            fg_color=COLORS['video_bg'],
+            width=default_width,
+            height=default_height
         )
         self.video_label.grid(row=0, column=0, sticky="")
 
         # Bind resize events
         self.video_frame.bind("<Configure>", self._on_video_frame_resize)
 
-        # Progress bar
-        self.progress_bar = ctk.CTkProgressBar(right_frame, variable=self.progress_var)
-        self.progress_bar.pack(padx=10, pady=(0, 10), fill="x")
+        # Bind mouse movement for overlay controls (on container, not just video)
+        video_container.bind("<Enter>", lambda e: self._show_controls())
+        video_container.bind("<Leave>", lambda e: self._reset_auto_hide_timer())
+        video_container.bind("<Motion>", self._on_mouse_movement)
+        self.video_label.bind("<Motion>", self._on_mouse_movement)
+
+        # Controls overlay (bottom of video container, Netflix-style)
+        controls_overlay = ctk.CTkFrame(
+            video_container,
+            fg_color=COLORS['bg_tertiary'],  # Dark gray overlay
+            height=80
+        )
+        controls_overlay.place(relx=0.5, rely=1.0, anchor="s", relwidth=1.0)
+        self.controls_overlay = controls_overlay  # Store reference
+
+        # Control buttons inside overlay (circular icon buttons)
+        controls_inner = ctk.CTkFrame(controls_overlay, fg_color=COLORS['bg_tertiary'])
+        controls_inner.pack(expand=True)
+
+        # Previous button
+        ctk.CTkButton(
+            controls_inner,
+            text="◀",
+            command=self._previous_clip,
+            width=50,
+            height=50,
+            corner_radius=25,
+            font=ctk.CTkFont(size=20),
+            fg_color=COLORS['bg_secondary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        ).pack(side="left", padx=10)
+
+        # Play/Pause button (larger, more prominent)
+        self.play_pause_button = ctk.CTkButton(
+            controls_inner,
+            text="⏸",
+            command=self._toggle_pause,
+            width=60,
+            height=60,
+            corner_radius=30,
+            font=ctk.CTkFont(size=24),
+            fg_color=COLORS['bg_secondary'],
+            border_color=COLORS['text_secondary'],
+            border_width=2,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['accent_active_hover']
+        )
+        self.play_pause_button.pack(side="left", padx=10)
+
+        # Next button
+        ctk.CTkButton(
+            controls_inner,
+            text="▶",
+            command=self._next_clip,
+            width=50,
+            height=50,
+            corner_radius=25,
+            font=ctk.CTkFont(size=20),
+            fg_color=COLORS['bg_secondary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        ).pack(side="left", padx=10)
+
+        # Delete button (red accent)
+        ctk.CTkButton(
+            controls_inner,
+            text="🗑",
+            command=self._delete_clip,
+            width=50,
+            height=50,
+            corner_radius=25,
+            font=ctk.CTkFont(size=18),
+            fg_color=COLORS['bg_secondary'],
+            border_color=COLORS['accent_danger'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['accent_danger']
+        ).pack(side="left", padx=10)
+
+        # Progress bar (thin, elegant timeline scrubber)
+        self.progress_bar = ctk.CTkProgressBar(
+            right_frame,
+            variable=self.progress_var,
+            height=6,
+            corner_radius=3,
+            progress_color=COLORS['text_primary'],
+            fg_color=COLORS['bg_tertiary']
+        )
+        self.progress_bar.grid(row=2, column=0, sticky="ew", padx=10, pady=5)
         self.progress_bar.set(0)
 
-        # Overlay label for end-of-clip message (not packed initially)
+        # Overlay label for end-of-clip message (not placed initially)
         self.overlay_label = ctk.CTkLabel(
             right_frame,
             text="",
@@ -170,146 +377,40 @@ class ReviewTab:
             height=120
         )
 
-        # Info section
-        self.info_label = ctk.CTkLabel(
-            right_frame,
+        # Compact info strip (single line with left/center/right sections)
+        info_strip = ctk.CTkFrame(right_frame, height=40, fg_color=COLORS['bg_secondary'])
+        info_strip.grid(row=3, column=0, sticky="ew")
+        info_strip.grid_propagate(False)  # Maintain fixed height
+
+        # Left: Clip filename
+        self.info_filename_label = ctk.CTkLabel(
+            info_strip,
             text="",
             font=ctk.CTkFont(**BODY_FONT),
-            justify="left"
+            text_color=COLORS['text_primary'],
+            anchor="w"
         )
-        self.info_label.pack(padx=10, pady=(0, 10), anchor="w")
+        self.info_filename_label.pack(side="left", padx=10, fill="x", expand=False)
 
-        # Control buttons frame
-        controls_frame = ctk.CTkFrame(right_frame, fg_color=COLORS['bg_primary'])
-        controls_frame.pack(padx=10, pady=5)
-
-        ctk.CTkButton(
-            controls_frame,
-            text="< Previous",
-            command=self._previous_clip,
-            width=120
-        ).pack(side="left", padx=5)
-
-        # Play/Pause button
-        self.play_pause_button = ctk.CTkButton(
-            controls_frame,
-            text="Pause",
-            command=self._toggle_pause,
-            width=120
+        # Center: Animals detected
+        self.info_animals_label = ctk.CTkLabel(
+            info_strip,
+            text="",
+            font=ctk.CTkFont(**BODY_FONT),
+            text_color=COLORS['text_secondary'],
+            anchor="center"
         )
-        self.play_pause_button.pack(side="left", padx=5)
+        self.info_animals_label.pack(side="left", padx=10, fill="x", expand=True)
 
-        ctk.CTkButton(
-            controls_frame,
-            text="Delete",
-            command=self._delete_clip,
-            width=120,
-            fg_color=COLORS['accent_danger'],
-            hover_color=COLORS['accent_danger_hover']
-        ).pack(side="left", padx=5)
-
-        ctk.CTkButton(
-            controls_frame,
-            text="Next >",
-            command=self._next_clip,
-            width=120
-        ).pack(side="left", padx=5)
-
-        # Playback speed slider
-        speed_frame = ctk.CTkFrame(right_frame, fg_color=COLORS['bg_primary'])
-        speed_frame.pack(padx=10, pady=10, fill="x")
-
-        ctk.CTkLabel(
-            speed_frame,
-            text="Playback Speed:",
-            font=ctk.CTkFont(**BODY_FONT)
-        ).pack(side="left", padx=(0, 10))
-
-        self.speed_value_label = ctk.CTkLabel(
-            speed_frame,
-            text=f"{self.speed_var.get():.1f}x",
-            font=ctk.CTkFont(**HEADING_FONT),
-            width=50
+        # Right: Clip count
+        self.info_count_label = ctk.CTkLabel(
+            info_strip,
+            text="",
+            font=ctk.CTkFont(**BODY_FONT),
+            text_color=COLORS['text_primary'],
+            anchor="e"
         )
-        self.speed_value_label.pack(side="left", padx=5)
-
-        speed_slider = ctk.CTkSlider(
-            speed_frame,
-            from_=PLAY_RATE_RANGE[0],
-            to=PLAY_RATE_RANGE[1],
-            variable=self.speed_var,
-            number_of_steps=int((PLAY_RATE_RANGE[1] - PLAY_RATE_RANGE[0]) * 2),
-            width=300,
-            command=self._update_speed
-        )
-        speed_slider.pack(side="left", padx=10)
-
-        # Playback Settings Panel
-        settings_frame = ctk.CTkFrame(right_frame, fg_color=COLORS['bg_primary'])
-        settings_frame.pack(padx=10, pady=(10, 0), fill="x")
-
-        ctk.CTkLabel(
-            settings_frame,
-            text="Playback Settings:",
-            font=ctk.CTkFont(**BODY_FONT)
-        ).pack(side="left", padx=(0, 10))
-
-        # Keyboard shortcuts toggle
-        self.shortcuts_checkbox = ctk.CTkCheckBox(
-            settings_frame,
-            text="Keyboard Shortcuts",
-            variable=self.shortcuts_enabled_var,
-            command=self._on_shortcuts_toggle,
-            font=ctk.CTkFont(**BODY_FONT)
-        )
-        self.shortcuts_checkbox.pack(side="left", padx=10)
-
-        # Auto-play toggle
-        self.auto_play_checkbox = ctk.CTkCheckBox(
-            settings_frame,
-            text="Auto-Play Next",
-            variable=self.auto_play_enabled_var,
-            font=ctk.CTkFont(**BODY_FONT)
-        )
-        self.auto_play_checkbox.pack(side="left", padx=10)
-
-        # Pause duration slider
-        pause_frame = ctk.CTkFrame(right_frame, fg_color=COLORS['bg_primary'])
-        pause_frame.pack(padx=10, pady=(10, 0), fill="x")
-
-        ctk.CTkLabel(
-            pause_frame,
-            text="Pause Between Clips:",
-            font=ctk.CTkFont(**BODY_FONT)
-        ).pack(side="left", padx=(0, 10))
-
-        self.pause_value_label = ctk.CTkLabel(
-            pause_frame,
-            text=f"{self.pause_duration_var.get():.1f}s",
-            font=ctk.CTkFont(**HEADING_FONT),
-            width=50
-        )
-        self.pause_value_label.pack(side="left", padx=5)
-
-        pause_slider = ctk.CTkSlider(
-            pause_frame,
-            from_=PAUSE_DURATION_RANGE[0],
-            to=PAUSE_DURATION_RANGE[1],
-            variable=self.pause_duration_var,
-            number_of_steps=20,  # 0.5s increments
-            width=200,
-            command=self._update_pause_duration
-        )
-        pause_slider.pack(side="left", padx=10)
-
-        # Keyboard shortcuts help
-        shortcuts_text = "Keyboard: n=Next  p=Previous  d=Delete  space=Pause/Resume  q=Stop"
-        ctk.CTkLabel(
-            right_frame,
-            text=shortcuts_text,
-            font=ctk.CTkFont(**SMALL_FONT),
-            text_color=COLORS['text_secondary']
-        ).pack(padx=10, pady=(5, 10))
+        self.info_count_label.pack(side="right", padx=10, fill="x", expand=False)
 
         # Bind keyboard shortcuts to main window with focus checks
         root = self.parent.winfo_toplevel()
@@ -323,6 +424,20 @@ class ReviewTab:
         root.bind("<q>", lambda e: self._stop_playback() if self._should_execute_shortcut() else None)
         root.bind("<Q>", lambda e: self._stop_playback() if self._should_execute_shortcut() else None)
 
+        # Speed control shortcuts
+        root.bind("<plus>", lambda e: self._increase_speed() if self._should_execute_shortcut() else None)
+        root.bind("<equal>", lambda e: self._increase_speed() if self._should_execute_shortcut() else None)
+        root.bind("<minus>", lambda e: self._decrease_speed() if self._should_execute_shortcut() else None)
+        root.bind("<0>", lambda e: self._reset_speed() if self._should_execute_shortcut() else None)
+
+        # Settings shortcuts
+        root.bind("<a>", lambda e: self._toggle_auto_play() if self._should_execute_shortcut() else None)
+        root.bind("<A>", lambda e: self._toggle_auto_play() if self._should_execute_shortcut() else None)
+        root.bind("<s>", lambda e: self._show_settings_panel() if self._should_execute_shortcut() else None)
+        root.bind("<S>", lambda e: self._show_settings_panel() if self._should_execute_shortcut() else None)
+        root.bind("<h>", lambda e: self._show_shortcuts_help() if self._should_execute_shortcut() else None)
+        root.bind("<H>", lambda e: self._show_shortcuts_help() if self._should_execute_shortcut() else None)
+
     def _update_speed(self, value):
         """Update playback speed label and video player."""
         speed = float(value)
@@ -331,11 +446,24 @@ class ReviewTab:
             self.player.set_speed(speed)
 
     def _on_video_frame_resize(self, event):
-        """Handle video frame resize to update player dimensions."""
-        if self.player and event.width > 1 and event.height > 1:
-            available_width = max(400, event.width - 20)
-            available_height = max(300, event.height - 20)
+        """Handle video frame resize with debouncing to prevent glitches."""
+        # Cancel previous timer if exists
+        if self.resize_debounce_timer:
+            self.video_frame.after_cancel(self.resize_debounce_timer)
+
+        # Schedule resize after 300ms of no resize events (user stopped dragging)
+        self.resize_debounce_timer = self.video_frame.after(
+            300,
+            lambda: self._apply_resize(event.width, event.height)
+        )
+
+    def _apply_resize(self, width: int, height: int):
+        """Apply the resize after debounce delay."""
+        if self.player and width > 1 and height > 1:
+            available_width = max(400, width - 20)
+            available_height = max(300, height - 20)
             self.player.set_target_container_size(available_width, available_height)
+        self.resize_debounce_timer = None
 
     def _load_clips(self):
         """Load clips from CSV and populate clip list."""
@@ -394,6 +522,14 @@ class ReviewTab:
         else:
             for idx, clip in enumerate(self.clips):
                 self._create_clip_button(idx, clip)
+
+            # Bind scroll events to dynamically created clip widgets
+            for clip in self.clips:
+                if 'frame_widget' in clip:
+                    self._bind_mousewheel(clip['frame_widget'])
+
+            # Also rebind to the list frame itself
+            self._bind_mousewheel(self.clip_list_frame)
 
             # Auto-play first clip
             self._play_clip(0)
@@ -454,6 +590,9 @@ class ReviewTab:
         if index < 0 or index >= len(self.clips):
             return
 
+        # Set flag to block mouse events during layout changes
+        self.layout_in_progress = True
+
         # Stop current playback
         if self.player:
             self.player.stop()
@@ -461,15 +600,17 @@ class ReviewTab:
         clip = self.clips[index]
         self.current_index = index
 
-        # Update info label with nicely formatted animals
-        animals_display = clip['animals'].replace('&', ', ').replace('_', ', ')
-        multiple_text = "Yes" if clip['multiple'] else "No"
-        info_text = (
-            f"Current: {clip['title']}\n"
-            f"Animals: {animals_display}\n"
-            f"Multiple: {multiple_text}"
-        )
-        self.info_label.configure(text=info_text)
+        # Save progress and state to session manager
+        if self.session_manager:
+            self.session_manager.save_clip_index(index)
+            self.session_manager.save_state(self._get_preferences())
+
+        # Update compact info strip (left/center/right sections)
+        animals_display = clip['animals'].replace('&', ' • ').replace('_', ', ')
+
+        self.info_filename_label.configure(text=f"🎬 {clip['title']}")
+        self.info_animals_label.configure(text=animals_display if animals_display else "No animals detected")
+        self.info_count_label.configure(text=f"{index + 1} / {len(self.clips)}")
 
         # Highlight current clip frame
         for i, c in enumerate(self.clips):
@@ -482,8 +623,8 @@ class ReviewTab:
         # Reset progress bar
         self.progress_var.set(0.0)
 
-        # Reset play/pause button to "Pause"
-        self.play_pause_button.configure(text="Pause")
+        # Reset play/pause button to pause icon
+        self.play_pause_button.configure(text="⏸")
 
         # Create and start video player
         try:
@@ -502,11 +643,17 @@ class ReviewTab:
 
             self.player.set_speed(self.speed_var.get())
             self.player.start()
+
+            # Start auto-hide timer for controls
+            self._reset_auto_hide_timer()
         except Exception as e:
             messagebox.showerror(
                 "Playback Error",
                 f"Failed to play video:\n{e}"
             )
+        finally:
+            # Clear layout flag immediately (blocking operations already done)
+            self.layout_in_progress = False
 
     def _update_frame(self, ctk_image):
         """Thread-safe callback to update video frame."""
@@ -639,35 +786,64 @@ class ReviewTab:
             self.player.toggle_pause()
             # Update button text based on paused state
             if self.player.paused:
-                self.play_pause_button.configure(text="Play")
+                self.play_pause_button.configure(text="▶")
+                # Cancel auto-hide timer when paused (show controls)
+                self._cancel_auto_hide_timer()
             else:
-                self.play_pause_button.configure(text="Pause")
+                self.play_pause_button.configure(text="⏸")
+                # Restart auto-hide timer when resumed
+                self._reset_auto_hide_timer()
 
     def _stop_playback(self):
         """Stop current playback."""
         if self.player:
             self.player.stop()
             self.video_label.configure(text="Playback stopped\nSelect a clip to resume")
+            # Cancel auto-hide timer and show controls
+            self._cancel_auto_hide_timer()
 
     def _bind_mousewheel(self, widget):
-        """Bind mouse wheel events for scrolling."""
-        # macOS and Windows
-        widget.bind("<MouseWheel>", self._on_mousewheel)
-        # Linux
-        widget.bind("<Button-4>", lambda e: self._on_mousewheel_linux(e, -1))
-        widget.bind("<Button-5>", lambda e: self._on_mousewheel_linux(e, 1))
+        """Bind mouse wheel events for scrolling - platform aware."""
+        system = platform.system()
+
+        if system == "Darwin":  # macOS
+            widget.bind("<MouseWheel>", self._on_mousewheel_mac)
+            # Also try to bind to the canvas directly for better compatibility
+            try:
+                canvas = widget._parent_canvas
+                canvas.bind("<MouseWheel>", self._on_mousewheel_mac)
+            except AttributeError:
+                pass
+        elif system == "Windows":
+            widget.bind("<MouseWheel>", self._on_mousewheel)
+        else:  # Linux
+            widget.bind("<Button-4>", lambda e: self._on_mousewheel_linux(e, -1))
+            widget.bind("<Button-5>", lambda e: self._on_mousewheel_linux(e, 1))
 
         # Also bind to children for better event capture
         for child in widget.winfo_children():
-            child.bind("<MouseWheel>", self._on_mousewheel)
-            child.bind("<Button-4>", lambda e: self._on_mousewheel_linux(e, -1))
-            child.bind("<Button-5>", lambda e: self._on_mousewheel_linux(e, 1))
+            if system == "Darwin":
+                child.bind("<MouseWheel>", self._on_mousewheel_mac)
+            elif system == "Windows":
+                child.bind("<MouseWheel>", self._on_mousewheel)
+            else:  # Linux
+                child.bind("<Button-4>", lambda e: self._on_mousewheel_linux(e, -1))
+                child.bind("<Button-5>", lambda e: self._on_mousewheel_linux(e, 1))
 
     def _on_mousewheel(self, event):
-        """Handle mouse wheel scroll event."""
+        """Handle Windows mouse wheel scroll event."""
         # Get the canvas from CTkScrollableFrame
         canvas = self.clip_list_frame._parent_canvas
         canvas.yview_scroll(-1 * int(event.delta / 120), "units")
+
+    def _on_mousewheel_mac(self, event):
+        """Handle macOS trackpad scroll event."""
+        # macOS delta is different - no division needed
+        try:
+            canvas = self.clip_list_frame._parent_canvas
+            canvas.yview_scroll(-1 * event.delta, "units")
+        except AttributeError:
+            pass
 
     def _on_mousewheel_linux(self, event, direction):
         """Handle Linux mouse wheel events."""
@@ -706,6 +882,11 @@ class ReviewTab:
             if 'frame_widget' in clip and clip['frame_widget'].winfo_exists():
                 clip['frame_widget'].pack(pady=2, padx=5, fill="x")
 
+    def _on_search_and_jump(self):
+        """Trigger search and jump to first match (called on Enter key)."""
+        self._on_search_changed()  # Apply search filter first
+        self._jump_to_first_match()  # Then jump to first match
+
     def _jump_to_first_match(self, event=None):
         """Jump to and play first matching clip."""
         search_text = self.search_var.get().lower()
@@ -731,7 +912,267 @@ class ReviewTab:
         """Update global shortcuts enabled state."""
         self.shortcuts_enabled_globally = self.shortcuts_enabled_var.get()
 
-    def _update_pause_duration(self, value):
-        """Update pause duration label."""
-        duration = float(value)
-        self.pause_value_label.configure(text=f"{duration:.1f}s")
+    def _increase_speed(self):
+        """Increase playback speed through discrete steps: 1x → 1.5x → 2x → 4x → 8x."""
+        speed_steps = [1.0, 1.5, 2.0, 4.0, 8.0]
+        current_speed = self.speed_var.get()
+
+        # Find next higher step
+        for speed in speed_steps:
+            if speed > current_speed + 0.01:  # Small tolerance for float comparison
+                self.speed_var.set(speed)
+                self._update_speed(speed)
+                return
+
+        # Already at max, stay at 8x
+        self.speed_var.set(8.0)
+        self._update_speed(8.0)
+
+    def _decrease_speed(self):
+        """Decrease playback speed through discrete steps: 8x → 4x → 2x → 1.5x → 1x."""
+        speed_steps = [8.0, 4.0, 2.0, 1.5, 1.0]
+        current_speed = self.speed_var.get()
+
+        # Find next lower step
+        for speed in speed_steps:
+            if speed < current_speed - 0.01:  # Small tolerance for float comparison
+                self.speed_var.set(speed)
+                self._update_speed(speed)
+                return
+
+        # Already at min, stay at 1x
+        self.speed_var.set(1.0)
+        self._update_speed(1.0)
+
+    def _reset_speed(self):
+        """Reset playback speed to 1x."""
+        self.speed_var.set(1.0)
+        self._update_speed(1.0)
+
+    def _toggle_auto_play(self):
+        """Toggle auto-play on/off."""
+        current = self.auto_play_enabled_var.get()
+        self.auto_play_enabled_var.set(not current)
+
+    def _show_shortcuts_help(self):
+        """Show keyboard shortcuts help overlay."""
+        modal = ShortcutsHelpModal(self.parent.winfo_toplevel())
+        modal.focus()
+
+    def _show_settings_panel(self):
+        """Show settings panel modal and pause video."""
+        # Remember if video was playing before opening settings
+        self.was_playing_before_settings = False
+        if self.player and not self.player.paused:
+            self.was_playing_before_settings = True
+            self.player.toggle_pause()
+            self.play_pause_button.configure(text="▶")
+
+        # Show settings modal
+        modal = SettingsPanelModal(
+            parent=self.parent.winfo_toplevel(),
+            speed_var=self.speed_var,
+            auto_play_var=self.auto_play_enabled_var,
+            pause_duration_var=self.pause_duration_var,
+            shortcuts_enabled_var=self.shortcuts_enabled_var,
+            on_speed_change=self._update_speed,
+            on_pause_duration_change=lambda v: None,  # No-op, value is already updated via variable
+            on_shortcuts_toggle=self._on_shortcuts_toggle,
+            on_close=self._on_settings_close
+        )
+        modal.focus()
+
+    def _on_settings_close(self):
+        """Resume video when settings panel closes if it was playing."""
+        if self.was_playing_before_settings and self.player:
+            self.player.toggle_pause()
+            self.play_pause_button.configure(text="⏸")
+
+    def _on_mouse_movement(self, event=None):
+        """Handle mouse movement with debouncing."""
+        # Block events during layout changes
+        if self.layout_in_progress:
+            return
+
+        # Cancel existing timer
+        if self.mouse_motion_debounce_timer:
+            self.video_frame.after_cancel(self.mouse_motion_debounce_timer)
+
+        # Debounce: wait 100ms before acting
+        self.mouse_motion_debounce_timer = self.video_frame.after(
+            100,
+            self._handle_mouse_movement_debounced
+        )
+
+    def _handle_mouse_movement_debounced(self):
+        """Actually handle mouse movement after debounce."""
+        if not self.controls_visible:
+            self._show_controls()
+
+        if self.player and not self.player.paused:
+            self._reset_auto_hide_timer()
+
+    def _show_controls(self):
+        """Show the playback controls (now always visible as overlay)."""
+        # Controls are now always-visible overlay - no-op
+        pass
+
+    def _hide_controls(self):
+        """Hide the playback controls (now always visible as overlay)."""
+        # Controls are now always-visible overlay - no-op
+        pass
+
+    def _reset_auto_hide_timer(self):
+        """Reset the auto-hide timer (controls now always visible)."""
+        # Controls are now always-visible overlay - no auto-hide needed
+        pass
+
+    def _cancel_auto_hide_timer(self):
+        """Cancel the auto-hide timer and ensure controls are visible."""
+        if self.auto_hide_timer:
+            self.video_frame.after_cancel(self.auto_hide_timer)
+            self.auto_hide_timer = None
+        self._show_controls()
+
+    def _show_advanced_menu(self):
+        """Show advanced options menu and pause video."""
+        # Save playing state and pause video if playing
+        self.was_playing_before_menu = False
+        if self.player and not self.player.paused:
+            self.was_playing_before_menu = True
+            self.player.toggle_pause()
+            self.play_pause_button.configure(text="▶")
+
+        # Create a simple menu modal
+        menu_modal = ctk.CTkToplevel(self.parent.winfo_toplevel())
+        menu_modal.title("Advanced Options")
+        menu_modal.geometry("300x280")
+        menu_modal.resizable(False, False)
+        menu_modal.transient(self.parent.winfo_toplevel())
+        menu_modal.grab_set()
+        menu_modal.configure(fg_color=COLORS['bg_secondary'])
+
+        # Title
+        ctk.CTkLabel(
+            menu_modal,
+            text="Advanced Options",
+            font=ctk.CTkFont(**TITLE_FONT),
+            text_color=COLORS['text_primary']
+        ).pack(pady=(20, 20))
+
+        # Menu buttons
+        button_frame = ctk.CTkFrame(menu_modal, fg_color=COLORS['bg_secondary'])
+        button_frame.pack(fill="both", expand=True, padx=30)
+
+        # Pipeline Cleanup
+        ctk.CTkButton(
+            button_frame,
+            text="Pipeline Cleanup",
+            command=lambda: self._open_cleanup_modal(menu_modal),
+            width=240,
+            height=40,
+            font=ctk.CTkFont(**HEADING_FONT),
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        ).pack(pady=5)
+
+        # Open Output Folder
+        ctk.CTkButton(
+            button_frame,
+            text="Open Output Folder",
+            command=lambda: self._open_output_folder(menu_modal),
+            width=240,
+            height=40,
+            font=ctk.CTkFont(**HEADING_FONT),
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        ).pack(pady=5)
+
+        # About
+        ctk.CTkButton(
+            button_frame,
+            text="About",
+            command=lambda: self._show_about(menu_modal),
+            width=240,
+            height=40,
+            font=ctk.CTkFont(**HEADING_FONT),
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        ).pack(pady=5)
+
+        # Close instruction
+        ctk.CTkLabel(
+            menu_modal,
+            text="Press 'Esc' to close",
+            font=ctk.CTkFont(**BODY_FONT),
+            text_color=COLORS['text_secondary']
+        ).pack(pady=(10, 15))
+
+        # Bind Esc and window close to resume video
+        menu_modal.bind("<Escape>", lambda e: self._close_advanced_menu(menu_modal))
+        menu_modal.protocol("WM_DELETE_WINDOW", lambda: self._close_advanced_menu(menu_modal))
+        menu_modal.focus()
+
+    def _close_advanced_menu(self, menu_modal):
+        """Close advanced menu and resume video if it was playing."""
+        menu_modal.destroy()
+        # Resume video if it was playing before menu opened
+        if self.was_playing_before_menu and self.player:
+            self.player.toggle_pause()
+            self.play_pause_button.configure(text="⏸")
+
+    def _open_cleanup_modal(self, parent_modal):
+        """Open cleanup modal and close menu."""
+        self._close_advanced_menu(parent_modal)
+        clips_dir = self.clips_dir_callback()
+        modal = CleanupModal(self.parent.winfo_toplevel(), clips_dir)
+        modal.focus()
+
+    def _open_output_folder(self, parent_modal):
+        """Open output folder in Finder and close menu."""
+        clips_dir = Path(self.clips_dir_callback())
+        output_dir = clips_dir / ".pipeline_output"
+
+        if not output_dir.exists():
+            messagebox.showwarning(
+                "Directory Not Found",
+                f"Output directory does not exist:\n{output_dir}\n\nRun the pipeline first."
+            )
+        else:
+            subprocess.run(["open", str(output_dir)])
+
+        self._close_advanced_menu(parent_modal)
+
+    def _show_about(self, parent_modal):
+        """Show about dialog and close menu."""
+        self._close_advanced_menu(parent_modal)
+        messagebox.showinfo(
+            "About TrailCam Animal ID",
+            "TrailCam Animal ID\n\n"
+            "A professional video review tool for analyzing trail camera footage.\n\n"
+            "Features:\n"
+            "• Automated animal detection\n"
+            "• Fast video playback (up to 8x speed)\n"
+            "• Keyboard shortcuts for efficient review\n"
+            "• Session-based progress tracking"
+        )
+
+    def _get_preferences(self) -> dict:
+        """Get current user preferences for state persistence.
+
+        Returns:
+            Dictionary of current preferences
+        """
+        return {
+            'play_rate': self.speed_var.get(),
+            'clip_pause_seconds': self.pause_duration_var.get()
+        }

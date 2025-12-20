@@ -7,7 +7,7 @@ from pathlib import Path
 from gui.process_runner import ProcessRunner
 from gui.config import (
     DEFAULT_CONFIG, get_worker_options, FRAMES_PER_CLIP_RANGE,
-    TITLE_FONT, HEADING_FONT, BODY_FONT, MONO_FONT
+    TITLE_FONT, HEADING_FONT, BODY_FONT, MONO_FONT, COLORS
 )
 
 
@@ -39,7 +39,7 @@ class PipelineTab:
         """Create all UI widgets for the pipeline tab."""
 
         # Input Configuration Frame
-        input_frame = ctk.CTkFrame(self.parent)
+        input_frame = ctk.CTkFrame(self.parent, fg_color=COLORS['bg_secondary'])
         input_frame.pack(padx=20, pady=10, fill="x")
 
         # Title
@@ -67,7 +67,12 @@ class PipelineTab:
             input_frame,
             text="Browse...",
             command=self._browse_clips,
-            width=100
+            width=100,
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
         ).grid(row=1, column=2, padx=10, pady=5)
 
         # Frames Directory
@@ -88,7 +93,12 @@ class PipelineTab:
             input_frame,
             text="Browse...",
             command=self._browse_frames,
-            width=100
+            width=100,
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
         ).grid(row=2, column=2, padx=10, pady=5)
 
         # Detection Directory
@@ -109,7 +119,12 @@ class PipelineTab:
             input_frame,
             text="Browse...",
             command=self._browse_detection,
-            width=100
+            width=100,
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
         ).grid(row=3, column=2, padx=10, pady=5)
 
         # Video Extensions
@@ -126,7 +141,7 @@ class PipelineTab:
         ).grid(row=4, column=1, padx=10, pady=5)
 
         # Frames per Clip
-        frames_label_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
+        frames_label_frame = ctk.CTkFrame(input_frame, fg_color=COLORS['bg_primary'])
         frames_label_frame.grid(row=5, column=0, sticky="w", padx=10, pady=5)
 
         ctk.CTkLabel(
@@ -193,7 +208,7 @@ class PipelineTab:
         ).grid(row=8, column=0, columnspan=2, sticky="w", padx=10, pady=10)
 
         # Execution Frame
-        exec_frame = ctk.CTkFrame(self.parent)
+        exec_frame = ctk.CTkFrame(self.parent, fg_color=COLORS['bg_secondary'])
         exec_frame.pack(padx=20, pady=10, fill="both", expand=True)
 
         # Title
@@ -204,7 +219,7 @@ class PipelineTab:
         ).pack(padx=10, pady=(10, 5), anchor="w")
 
         # Button Frame
-        button_frame = ctk.CTkFrame(exec_frame, fg_color="transparent")
+        button_frame = ctk.CTkFrame(exec_frame, fg_color=COLORS['bg_primary'])
         button_frame.pack(padx=10, pady=5, fill="x")
 
         self.run_button = ctk.CTkButton(
@@ -213,7 +228,12 @@ class PipelineTab:
             command=self._run_pipeline,
             width=150,
             height=40,
-            font=ctk.CTkFont(**HEADING_FONT)
+            font=ctk.CTkFont(**HEADING_FONT),
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['accent_active_hover']
         )
         self.run_button.pack(side="left", padx=5)
 
@@ -224,7 +244,12 @@ class PipelineTab:
             width=150,
             height=40,
             state="disabled",
-            font=ctk.CTkFont(**HEADING_FONT)
+            font=ctk.CTkFont(**HEADING_FONT),
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['accent_danger'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['accent_danger']
         )
         self.cancel_button.pack(side="left", padx=5)
 
@@ -252,7 +277,10 @@ class PipelineTab:
             exec_frame,
             width=940,
             height=300,
-            font=ctk.CTkFont(**MONO_FONT)
+            font=ctk.CTkFont(**MONO_FONT),
+            fg_color=COLORS['bg_primary'],  # Black background for log
+            border_color=COLORS['ui_frame'],  # Dark border
+            border_width=1
         )
         self.log_text.pack(padx=10, pady=(0, 10), fill="both", expand=True)
 

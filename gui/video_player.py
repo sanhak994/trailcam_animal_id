@@ -117,9 +117,9 @@ class VideoPlayer:
         """Stop playback and cleanup resources."""
         self.running = False
 
-        # Wait for thread to finish
+        # Wait for thread to finish (50ms is enough for graceful exit)
         if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=1.0)
+            self.thread.join(timeout=0.05)
 
         # Release video capture
         if self.cap:

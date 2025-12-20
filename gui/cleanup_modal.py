@@ -1,43 +1,70 @@
-"""Cleanup tab for managing pipeline outputs."""
+"""Cleanup modal for managing pipeline outputs."""
 
 import subprocess
 from pathlib import Path
 import customtkinter as ctk
 from tkinter import messagebox
 from send2trash import send2trash
-from gui.config import HEADING_FONT, BODY_FONT, COLORS
+from gui.config import TITLE_FONT, HEADING_FONT, BODY_FONT, COLORS
 
 
-class CleanupTab:
-    """Simple cleanup tab for managing pipeline outputs."""
+class CleanupModal(ctk.CTkToplevel):
+    """Modal for managing pipeline outputs."""
 
-    def __init__(self, parent, clips_dir_callback):
-        self.parent = parent
-        self.clips_dir_callback = clips_dir_callback  # Function to get clips dir
+    def __init__(self, parent, clips_dir):
+        super().__init__(parent)
+
+        # Window configuration
+        self.title("Pipeline Cleanup")
+        self.geometry("600x400")
+        self.resizable(False, False)
+
+        # Center on parent window
+        self.transient(parent)
+        self.grab_set()
+
+        # Set appearance
+        self.configure(fg_color=COLORS['bg_secondary'])
+
+        # Store clips directory
+        self.clips_dir = Path(clips_dir)
+
+        # Create content
         self._create_widgets()
 
-    def _create_widgets(self):
-        # Info section
-        info_frame = ctk.CTkFrame(self.parent, fg_color=COLORS['bg_secondary'])
-        info_frame.pack(padx=25, pady=15, fill="both", expand=True)
+        # Auto-refresh on open
+        self._refresh_info()
 
+        # Bind Esc to close
+        self.bind("<Escape>", lambda e: self.destroy())
+
+    def _create_widgets(self):
+        """Create modal content."""
+        # Title
         ctk.CTkLabel(
-            info_frame,
+            self,
             text="Pipeline Output Management",
-            font=ctk.CTkFont(**HEADING_FONT)
-        ).pack(padx=15, pady=(15, 10), anchor="w")
+            font=ctk.CTkFont(**TITLE_FONT),
+            text_color=COLORS['text_primary']
+        ).pack(pady=(20, 10))
+
+        # Info section
+        info_frame = ctk.CTkFrame(self, fg_color=COLORS['bg_primary'])
+        info_frame.pack(padx=30, pady=(10, 20), fill="both", expand=True)
 
         self.info_label = ctk.CTkLabel(
             info_frame,
-            text="Select a clips directory in the Pipeline tab to see output info",
+            text="Loading output information...",
             font=ctk.CTkFont(**BODY_FONT),
-            justify="left"
+            text_color=COLORS['text_primary'],
+            justify="left",
+            anchor="nw"
         )
-        self.info_label.pack(padx=15, pady=10, anchor="w")
+        self.info_label.pack(padx=20, pady=20, fill="both", expand=True)
 
         # Buttons frame
-        button_frame = ctk.CTkFrame(info_frame, fg_color=COLORS['bg_primary'])
-        button_frame.pack(padx=15, pady=10, anchor="w")
+        button_frame = ctk.CTkFrame(self, fg_color=COLORS['bg_secondary'])
+        button_frame.pack(padx=30, pady=(0, 20))
 
         ctk.CTkButton(
             button_frame,
@@ -75,11 +102,20 @@ class CleanupTab:
             hover_color=COLORS['accent_danger']
         ).pack(side="left", padx=5)
 
+        # Close instruction
+        ctk.CTkLabel(
+            self,
+            text="Press 'Esc' to close",
+            font=ctk.CTkFont(**BODY_FONT),
+            text_color=COLORS['text_secondary']
+        ).pack(pady=(0, 15))
+
     def _get_output_dir(self) -> Path:
-        clips_dir = self.clips_dir_callback()
-        return Path(clips_dir) / ".pipeline_output"
+        """Get the pipeline output directory."""
+        return self.clips_dir / ".pipeline_output"
 
     def _refresh_info(self):
+        """Refresh output directory information."""
         output_dir = self._get_output_dir()
 
         if not output_dir.exists():
@@ -109,7 +145,7 @@ class CleanupTab:
             size_str = f"{total_size / (1024 * 1024 * 1024):.2f} GB"
 
         info_text = (
-            f"Output Directory: {output_dir}\n\n"
+            f"Output Directory:\n{output_dir}\n\n"
             f"Total Files: {total_files:,}\n"
             f"Total Size: {size_str}\n\n"
             f"Subdirectories:\n"
@@ -120,6 +156,7 @@ class CleanupTab:
         self.info_label.configure(text=info_text)
 
     def _open_in_finder(self):
+        """Open output directory in Finder."""
         output_dir = self._get_output_dir()
 
         if not output_dir.exists():
@@ -132,6 +169,7 @@ class CleanupTab:
         subprocess.run(["open", str(output_dir)])
 
     def _delete_outputs(self):
+        """Delete all pipeline outputs."""
         output_dir = self._get_output_dir()
 
         if not output_dir.exists():
