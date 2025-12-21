@@ -1,6 +1,7 @@
 """Settings panel modal overlay."""
 
 import customtkinter as ctk
+from PIL import Image
 from gui.config import TITLE_FONT, HEADING_FONT, BODY_FONT, PLAY_RATE_RANGE, PAUSE_DURATION_RANGE, COLORS
 
 
@@ -8,7 +9,7 @@ class SettingsPanelModal(ctk.CTkToplevel):
     """Modal overlay for playback settings."""
 
     def __init__(self, parent, speed_var, auto_play_var, pause_duration_var, shortcuts_enabled_var,
-                 on_speed_change, on_pause_duration_change, on_shortcuts_toggle, on_close):
+                 on_speed_change, on_pause_duration_change, on_shortcuts_toggle, on_close, clips_dir_callback=None):
         super().__init__(parent)
 
         # Store callbacks and variables
@@ -22,8 +23,8 @@ class SettingsPanelModal(ctk.CTkToplevel):
         self.on_close_callback = on_close
 
         # Window configuration
-        self.title("Playback Settings")
-        self.geometry("500x400")
+        self.title("TrailCamID Settings")
+        self.geometry("550x550")
         self.resizable(False, False)
 
         # Center on parent window
@@ -44,13 +45,29 @@ class SettingsPanelModal(ctk.CTkToplevel):
 
     def _create_widgets(self):
         """Create modal content."""
+        # Header with logo
+        header_frame = ctk.CTkFrame(self, fg_color=COLORS['bg_secondary'])
+        header_frame.pack(fill="x", pady=0)
+
+        # Load and display logo
+        try:
+            logo_img = ctk.CTkImage(
+                light_image=Image.open("assets/logo.png"),
+                dark_image=Image.open("assets/logo.png"),
+                size=(50, 50)
+            )
+            logo_label = ctk.CTkLabel(header_frame, image=logo_img, text="")
+            logo_label.pack(side="left", padx=(15, 10), pady=10)
+        except Exception:
+            pass  # If logo not found, skip it
+
         # Title
         ctk.CTkLabel(
-            self,
-            text="Playback Settings",
-            font=ctk.CTkFont(**TITLE_FONT),
+            header_frame,
+            text="TrailCamID Settings",
+            font=ctk.CTkFont(size=18, weight="bold"),
             text_color=COLORS['text_primary']
-        ).pack(pady=(20, 30))
+        ).pack(side="left", padx=10, pady=10)
 
         # Content frame
         content_frame = ctk.CTkFrame(self, fg_color=COLORS['bg_primary'])

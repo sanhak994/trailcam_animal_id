@@ -32,6 +32,9 @@ class ReviewTab:
         self.shortcuts_enabled_globally = True  # Toggle from settings
         self.search_has_focus = False  # Track search box focus
 
+        # Deletion confirmation state (session-only, not persisted)
+        self.skip_delete_confirmation = False  # Reset on app restart for safety
+
         # Apply preferences if provided, otherwise use defaults
         if preferences:
             play_rate = preferences.get('play_rate', DEFAULT_CONFIG['play_rate'])
@@ -85,10 +88,9 @@ class ReviewTab:
         self.left_frame = left_frame  # Store reference for sidebar collapse
 
         # Configure grid layout for sidebar (fixed rows, no weight changes)
-        left_frame.grid_rowconfigure(0, weight=0)  # clips_label / edge_indicator
+        left_frame.grid_rowconfigure(0, weight=0)  # clips_label
         left_frame.grid_rowconfigure(1, weight=0)  # search_container
         left_frame.grid_rowconfigure(2, weight=1)  # clip_list_frame (expandable)
-        left_frame.grid_rowconfigure(3, weight=0)  # load_button
         left_frame.grid_columnconfigure(0, weight=1)
 
         # Clips label
@@ -176,20 +178,6 @@ class ReviewTab:
         # Bind mouse wheel events for trackpad scrolling
         self._bind_mousewheel(self.clip_list_frame)
 
-        # Load button (store reference for collapse)
-        self.load_button = ctk.CTkButton(
-            left_frame,
-            text="Load Clips",
-            command=self._load_clips,
-            width=200,
-            fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
-            border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        )
-        self.load_button.grid(row=3, column=0, padx=10, pady=(0, 10))
-
         # === RIGHT SIDE: Video Display and Controls ===
         right_frame = ctk.CTkFrame(main_frame, fg_color=COLORS['bg_primary'])
         right_frame.grid(row=0, column=1, sticky="nsew", padx=(3, 0))
@@ -246,26 +234,26 @@ class ReviewTab:
         video_container.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
         self.video_container = video_container  # Store reference
 
-        # Video frame (centered within container)
+        # Configure grid: 2 rows (video + controls)
+        video_container.grid_rowconfigure(0, weight=1)    # Video expands
+        video_container.grid_rowconfigure(1, weight=0)    # Controls fixed height
+        video_container.grid_columnconfigure(0, weight=1)
+
+        # Video frame (fills container)
         self.video_frame = ctk.CTkFrame(video_container, fg_color=COLORS['video_bg'])
-        self.video_frame.place(relx=0.5, rely=0.5, anchor="center")
+        self.video_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
 
         # Configure grid to center video label
         self.video_frame.grid_rowconfigure(0, weight=1)
         self.video_frame.grid_columnconfigure(0, weight=1)
 
-        # Reserve space for 16:9 video (most trail cams) to prevent layout shift on load
-        default_width = 640
-        default_height = int(default_width / (16/9))  # ~360
-
+        # Video label (expands to fill available space)
         self.video_label = ctk.CTkLabel(
             self.video_frame,
             text="Load clips to start reviewing",
-            fg_color=COLORS['video_bg'],
-            width=default_width,
-            height=default_height
+            fg_color=COLORS['video_bg']
         )
-        self.video_label.grid(row=0, column=0, sticky="")
+        self.video_label.grid(row=0, column=0, sticky="nsew")
 
         # Bind resize events
         self.video_frame.bind("<Configure>", self._on_video_frame_resize)
@@ -276,13 +264,13 @@ class ReviewTab:
         video_container.bind("<Motion>", self._on_mouse_movement)
         self.video_label.bind("<Motion>", self._on_mouse_movement)
 
-        # Controls overlay (bottom of video container, Netflix-style)
+        # Controls overlay (bottom of video container)
         controls_overlay = ctk.CTkFrame(
             video_container,
             fg_color=COLORS['bg_tertiary'],  # Dark gray overlay
             height=80
         )
-        controls_overlay.place(relx=0.5, rely=1.0, anchor="s", relwidth=1.0)
+        controls_overlay.grid(row=1, column=0, sticky="ew")
         self.controls_overlay = controls_overlay  # Store reference
 
         # Control buttons inside overlay (circular icon buttons)
@@ -657,13 +645,25 @@ class ReviewTab:
 
     def _update_frame(self, ctk_image):
         """Thread-safe callback to update video frame."""
-        # Schedule GUI update on main thread
-        self.video_label.after(0, lambda: self.video_label.configure(image=ctk_image, text=""))
+        # Schedule GUI update on main thread, with safety check
+        def safe_update():
+            try:
+                if self.video_label.winfo_exists():
+                    self.video_label.configure(image=ctk_image, text="")
+            except:
+                pass  # Widget destroyed, ignore
+        self.video_label.after(0, safe_update)
 
     def _update_progress(self, progress: float):
         """Thread-safe callback to update progress bar."""
-        # Schedule GUI update on main thread
-        self.progress_bar.after(0, lambda: self.progress_var.set(progress))
+        # Schedule GUI update on main thread, with safety check
+        def safe_update():
+            try:
+                if self.progress_bar.winfo_exists():
+                    self.progress_var.set(progress)
+            except:
+                pass  # Widget destroyed, ignore
+        self.progress_bar.after(0, safe_update)
 
     def _on_video_complete(self):
         """Called when video playback completes."""
@@ -736,49 +736,158 @@ class ReviewTab:
 
         clip = self.clips[self.current_index]
 
-        # Confirm with user
-        result = messagebox.askyesno(
-            "Confirm Delete",
-            f"Move {clip['title']} to Trash?\n\nAnimals: {clip['animals']}",
-            icon='warning'
-        )
+        # Check if user disabled confirmations this session
+        if not self.skip_delete_confirmation:
+            # Show custom confirmation dialog with checkbox
+            result, dont_ask_again = self._show_delete_confirmation(clip)
 
-        if result:
-            try:
-                # Stop playback
-                if self.player:
-                    self.player.stop()
+            if dont_ask_again:
+                self.skip_delete_confirmation = True
 
-                # Move to trash
-                send2trash(str(clip['path']))
+            if not result:
+                return  # User clicked "No"
 
-                # Remove from list
-                deleted_index = self.current_index
-                self.clips.pop(deleted_index)
+        # Proceed with deletion (confirmations either disabled or user clicked "Yes")
+        try:
+            # Stop playback
+            if self.player:
+                self.player.stop()
 
-                # Rebuild clip list UI
-                for widget in self.clip_list_frame.winfo_children():
-                    widget.destroy()
+            # Move to trash
+            send2trash(str(clip['path']))
 
-                if not self.clips:
-                    ctk.CTkLabel(
-                        self.clip_list_frame,
-                        text="No clips remaining",
-                        text_color=COLORS['text_secondary']
-                    ).pack(pady=20)
-                    self.video_label.configure(text="No more clips to review")
-                    self.current_index = None
-                else:
-                    # Recreate buttons
-                    for idx, c in enumerate(self.clips):
-                        self._create_clip_button(idx, c)
+            # Remove from list
+            deleted_index = self.current_index
+            self.clips.pop(deleted_index)
 
-                    # Play next clip (or previous if at end)
-                    next_index = min(deleted_index, len(self.clips) - 1)
-                    self._play_clip(next_index)
+            # Rebuild clip list UI
+            for widget in self.clip_list_frame.winfo_children():
+                widget.destroy()
 
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to delete clip:\n{e}")
+            if not self.clips:
+                ctk.CTkLabel(
+                    self.clip_list_frame,
+                    text="No clips remaining",
+                    text_color=COLORS['text_secondary']
+                ).pack(pady=20)
+                self.video_label.configure(text="No more clips to review")
+                self.current_index = None
+            else:
+                # Recreate buttons
+                for idx, c in enumerate(self.clips):
+                    self._create_clip_button(idx, c)
+
+                # Play next clip (or previous if at end)
+                next_index = min(deleted_index, len(self.clips) - 1)
+                self._play_clip(next_index)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete clip:\n{e}")
+
+    def _show_delete_confirmation(self, clip):
+        """Show custom delete confirmation with 'skip confirmation' checkbox.
+
+        Returns:
+            tuple: (confirmed: bool, dont_ask_again: bool)
+        """
+        # Create modal dialog
+        dialog = ctk.CTkToplevel(self.parent.winfo_toplevel())
+        dialog.title("Confirm Delete")
+        dialog.geometry("400x220")
+        dialog.resizable(False, False)
+        dialog.transient(self.parent.winfo_toplevel())
+        dialog.grab_set()
+        dialog.configure(fg_color=COLORS['bg_secondary'])
+
+        # Center on parent
+        dialog.update_idletasks()
+        parent = self.parent.winfo_toplevel()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (400 // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (220 // 2)
+        dialog.geometry(f"+{x}+{y}")
+
+        # Result variables
+        confirmed = False
+        dont_ask = False
+
+        # Message
+        ctk.CTkLabel(
+            dialog,
+            text="Move clip to Trash?",
+            font=ctk.CTkFont(**HEADING_FONT),
+            text_color=COLORS['text_primary']
+        ).pack(pady=(20, 10))
+
+        ctk.CTkLabel(
+            dialog,
+            text=f"{clip['title']}\n\nAnimals: {clip['animals']}",
+            font=ctk.CTkFont(**BODY_FONT),
+            text_color=COLORS['text_secondary'],
+            justify="center"
+        ).pack(pady=(0, 15))
+
+        # Checkbox
+        dont_ask_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            dialog,
+            text="Skip confirmation this session",
+            variable=dont_ask_var,
+            font=ctk.CTkFont(**BODY_FONT),
+            fg_color=COLORS['text_secondary'],
+            border_color=COLORS['text_secondary'],
+            text_color=COLORS['text_primary'],
+            checkmark_color=COLORS['bg_primary']
+        ).pack(pady=(0, 20))
+
+        # Buttons
+        def on_yes():
+            nonlocal confirmed, dont_ask
+            confirmed = True
+            dont_ask = dont_ask_var.get()  # Only applies checkbox if clicking Yes
+            dialog.destroy()
+
+        def on_no():
+            nonlocal confirmed
+            confirmed = False
+            # NOTE: Checkbox is IGNORED when clicking No (matches macOS behavior)
+            # User must click Yes to confirm they don't want prompts
+            dialog.destroy()
+
+        button_frame = ctk.CTkFrame(dialog, fg_color=COLORS['bg_secondary'])
+        button_frame.pack(pady=(0, 20))
+
+        ctk.CTkButton(
+            button_frame,
+            text="No",
+            command=on_no,
+            width=100,
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['ui_button_hover']
+        ).pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            button_frame,
+            text="Yes",
+            command=on_yes,
+            width=100,
+            fg_color=COLORS['bg_primary'],
+            border_color=COLORS['accent_danger'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            hover_color=COLORS['accent_danger']
+        ).pack(side="left", padx=5)
+
+        # Keyboard shortcuts
+        dialog.bind("<Return>", lambda e: on_yes())
+        dialog.bind("<Escape>", lambda e: on_no())
+
+        # Wait for dialog to close
+        dialog.wait_window()
+
+        return confirmed, dont_ask
 
     def _toggle_pause(self):
         """Toggle pause/resume on current video."""
@@ -978,7 +1087,8 @@ class ReviewTab:
             on_speed_change=self._update_speed,
             on_pause_duration_change=lambda v: None,  # No-op, value is already updated via variable
             on_shortcuts_toggle=self._on_shortcuts_toggle,
-            on_close=self._on_settings_close
+            on_close=self._on_settings_close,
+            clips_dir_callback=self.clips_dir_callback
         )
         modal.focus()
 
@@ -1064,19 +1174,19 @@ class ReviewTab:
         button_frame = ctk.CTkFrame(menu_modal, fg_color=COLORS['bg_secondary'])
         button_frame.pack(fill="both", expand=True, padx=30)
 
-        # Pipeline Cleanup
+        # Start Over
         ctk.CTkButton(
             button_frame,
-            text="Pipeline Cleanup",
-            command=lambda: self._open_cleanup_modal(menu_modal),
+            text="Start Over",
+            command=lambda: self._start_over(menu_modal),
             width=240,
             height=40,
             font=ctk.CTkFont(**HEADING_FONT),
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['accent_danger'],
             border_width=1,
             text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
+            hover_color=COLORS['accent_danger']
         ).pack(pady=5)
 
         # Open Output Folder
@@ -1136,6 +1246,73 @@ class ReviewTab:
         clips_dir = self.clips_dir_callback()
         modal = CleanupModal(self.parent.winfo_toplevel(), clips_dir)
         modal.focus()
+
+    def _start_over(self, parent_modal):
+        """Delete pipeline outputs and return to startup screen."""
+        # Close the advanced menu first
+        self._close_advanced_menu(parent_modal)
+
+        # Get clips directory and output path
+        clips_dir = Path(self.clips_dir_callback())
+        output_dir = clips_dir / ".pipeline_output"
+
+        # Check if outputs exist
+        if not output_dir.exists():
+            messagebox.showinfo(
+                "Nothing to Delete",
+                "No pipeline outputs found.\n\n"
+                "Click 'Start New Analysis' to run the pipeline."
+            )
+            return
+
+        # Confirmation dialog
+        result = messagebox.askyesno(
+            "Start Over",
+            "This will:\n\n"
+            "• Delete all pipeline outputs\n"
+            "• Return to the startup screen\n"
+            "• Let you start fresh with the wizard\n\n"
+            "The outputs will be moved to Trash and can be recovered.\n\n"
+            "Continue?",
+            icon='warning'
+        )
+
+        if not result:
+            return
+
+        try:
+            # 1. Cancel all pending timers to prevent callbacks on destroyed widgets
+            if self.auto_hide_timer:
+                self.video_frame.after_cancel(self.auto_hide_timer)
+                self.auto_hide_timer = None
+            if self.mouse_motion_debounce_timer:
+                self.video_frame.after_cancel(self.mouse_motion_debounce_timer)
+                self.mouse_motion_debounce_timer = None
+            if self.resize_debounce_timer:
+                self.video_frame.after_cancel(self.resize_debounce_timer)
+                self.resize_debounce_timer = None
+
+            # 2. Stop video player to prevent frame update callbacks
+            if self.player:
+                self.player.stop()
+
+            # 3. Delete .pipeline_output folder (sends to Trash)
+            send2trash(str(output_dir))
+
+            # 4. Reset session state
+            if self.session_manager:
+                self.session_manager.reset()
+                self.session_manager.save_state(self._get_preferences())
+
+            # 5. Navigate back to startup screen
+            root = self.parent.winfo_toplevel()
+            root._show_startup_screen()
+
+        except Exception as e:
+            messagebox.showerror(
+                "Error",
+                f"Failed to reset pipeline:\n\n{str(e)}"
+            )
 
     def _open_output_folder(self, parent_modal):
         """Open output folder in Finder and close menu."""
