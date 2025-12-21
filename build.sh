@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 APP_NAME="TrailCam Animal ID"
 VERSION="1.0.0"
-PYTHON_VERSION="3.12"
+PYTHON_VERSION="3.14.2"
 
 # Check Python version
 echo "${YELLOW}[1/8] Checking Python version...${NC}"
@@ -57,13 +57,14 @@ echo ""
 
 # Install build dependencies
 echo "${YELLOW}[4/8] Installing build dependencies...${NC}"
-pip install --upgrade py2app setuptools wheel > /dev/null 2>&1
+pip install --upgrade pyinstaller > /dev/null 2>&1
 echo "${GREEN}✓ Build tools ready${NC}"
 echo ""
 
 # Build the app
 echo "${YELLOW}[5/8] Building macOS application...${NC}"
-python3 setup.py py2app
+pyinstaller --clean --noconfirm TrailCam.spec
+
 echo "${GREEN}✓ App bundle created: dist/${APP_NAME}.app${NC}"
 echo ""
 

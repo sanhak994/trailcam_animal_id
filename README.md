@@ -15,7 +15,7 @@ A way to quickly id animals on trailcam footage and review clips with annotation
 ## Getting Started
 
 ### For macOS Users (Recommended)
-- Tested with MacOS Tahoe 26.1 and Python 3.12
+- Tested with MacOS Tahoe 26.1 and Python 3.14.2
 
 **Quick Install (choose one):**
 

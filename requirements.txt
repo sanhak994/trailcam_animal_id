@@ -1,10 +1,23 @@
+# Full development requirements (includes GUI + backend + pipeline)
+
+# Pipeline dependencies (for classify_frames.py, extract_frames.py, etc.)
 ultralytics==8.3.237
 huggingface_hub==1.2.3
-opencv-python-headless==4.12.0.88
+torch==2.9.1
 Send2Trash==1.8.3
 tqdm==4.67.1
-torch==2.9.1
-numpy==2.2.6
-customtkinter==5.2.2
-pillow==12.0.0
 appdirs==1.4.4
+
+# GUI dependencies (see requirements-gui.txt)
+customtkinter==5.2.2
+darkdetect==0.8.0
+requests==2.32.3
+
+# Backend dependencies (see requirements-backend.txt)
+opencv-python==4.12.0.88
+fastapi==0.115.6
+uvicorn==0.34.0
+
+# Shared dependencies
+numpy==2.2.6
+pillow==12.0.0
