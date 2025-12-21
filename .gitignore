@@ -24,3 +24,4 @@ build/
 *.egg-info/
 .gitattributes
 CLAUDE.md
+.claude
