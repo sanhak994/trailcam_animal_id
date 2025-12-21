@@ -19,8 +19,13 @@ def run_cmd(cmd: List[str]):
 
 
 def any_frames_exist(frames_dir: Path) -> bool:
+    if not frames_dir.exists():
+        return False
     patterns = ["*.jpg", "*.jpeg", "*.png"]
-    return any(frames_dir.glob(p) for p in patterns)
+    for pattern in patterns:
+        if next(frames_dir.glob(pattern), None) is not None:
+            return True
+    return False
 
 
 def parse_args():
