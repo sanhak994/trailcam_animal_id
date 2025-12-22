@@ -5,6 +5,7 @@ This client mimics cv2.VideoCapture interface but makes HTTP requests to the bac
 
 import base64
 import io
+import os
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -22,13 +23,18 @@ class VideoCapture:
     CAP_PROP_FPS = 5
     CAP_PROP_FRAME_COUNT = 7
 
-    def __init__(self, path: str, backend_url: str = "http://127.0.0.1:8001"):
+    def __init__(self, path: str, backend_url: Optional[str] = None):
         """Initialize video capture client.
 
         Args:
             path: Path to video file
-            backend_url: URL of video backend server
+            backend_url: URL of video backend server (reads from env if not provided)
         """
+        # Read backend port from environment variable if not provided
+        if backend_url is None:
+            port = os.environ.get("TRAILCAM_BACKEND_PORT", "8001")
+            backend_url = f"http://127.0.0.1:{port}"
+
         self.backend_url = backend_url.rstrip('/')
         self.session_id: Optional[str] = None
         self._opened = False

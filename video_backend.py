@@ -152,5 +152,48 @@ async def shutdown_event():
 
 
 if __name__ == "__main__":
+    import sys
+    import os
+    import socket
+    from datetime import datetime
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001, log_level="error")
+
+    # Set up logging - write directly to file to avoid stdout redirection issues
+    # Check if we're frozen (packaged executable) - if so, must write to file ourselves
+    if getattr(sys, 'frozen', False):
+        # Running as packaged executable - write logs directly to file
+        log_file_obj = open("/tmp/trailcam_backend.log", "w", buffering=1)
+        sys.stdout = log_file_obj
+        sys.stderr = log_file_obj
+
+    # Print diagnostics (goes to stdout, which is file if frozen or parent's redirect if not)
+    print(f"=== TrailCam Video Backend ===", flush=True)
+    print(f"Started: {datetime.now()}", flush=True)
+    print(f"Python: {sys.executable}", flush=True)
+    print(f"Working dir: {os.getcwd()}", flush=True)
+    print(f"Frozen: {getattr(sys, 'frozen', False)}", flush=True)
+
+    # Find an available ephemeral port
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(('127.0.0.1', 0))
+    port = sock.getsockname()[1]
+    sock.close()
+
+    print(f"Bound to port: {port}", flush=True)
+
+    # Write port to file for GUI to read
+    port_file = "/tmp/trailcam_backend_port"
+    with open(port_file, "w") as f:
+        f.write(str(port))
+    print(f"Wrote port to: {port_file}", flush=True)
+
+    # Write ready signal
+    ready_file = os.environ.get("TRAILCAM_BACKEND_READY", "/tmp/trailcam_backend_ready")
+    with open(ready_file, "w") as f:
+        f.write(f"ready:{port}\n")
+    print(f"Wrote ready signal to: {ready_file}", flush=True)
+
+    print(f"Starting uvicorn server on http://127.0.0.1:{port}", flush=True)
+
+    # Start server
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")

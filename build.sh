@@ -18,7 +18,7 @@ VERSION="1.0.0"
 PYTHON_VERSION="3.14.2"
 
 # Check Python version
-echo "${YELLOW}[1/8] Checking Python version...${NC}"
+echo "${YELLOW}[1/9] Checking Python version...${NC}"
 python3 --version | grep -q "Python 3" || {
     echo "${RED}Error: Python 3.9+ required${NC}"
     exit 1
@@ -27,14 +27,14 @@ echo "${GREEN}✓ Python OK${NC}"
 echo ""
 
 # Clean previous builds
-echo "${YELLOW}[2/8] Cleaning previous builds...${NC}"
+echo "${YELLOW}[2/9] Cleaning previous builds...${NC}"
 rm -rf build dist *.egg-info
 rm -f assets/icon.icns
 echo "${GREEN}✓ Clean complete${NC}"
 echo ""
 
 # Create application icon
-echo "${YELLOW}[3/8] Creating application icon...${NC}"
+echo "${YELLOW}[3/9] Creating application icon...${NC}"
 mkdir -p assets/icon.iconset
 
 # Generate icon sizes using sips (built-in macOS tool)
@@ -56,20 +56,31 @@ echo "${GREEN}✓ Icon created: assets/icon.icns${NC}"
 echo ""
 
 # Install build dependencies
-echo "${YELLOW}[4/8] Installing build dependencies...${NC}"
+echo "${YELLOW}[4/9] Installing build dependencies...${NC}"
 pip install --upgrade pyinstaller > /dev/null 2>&1
 echo "${GREEN}✓ Build tools ready${NC}"
 echo ""
 
-# Build the app
-echo "${YELLOW}[5/8] Building macOS application...${NC}"
+# Build the backend executable first
+echo "${YELLOW}[5/9] Building backend executable...${NC}"
+pyinstaller --clean --noconfirm backend.spec
+echo "${GREEN}✓ Backend executable created: dist/trailcam_backend${NC}"
+echo ""
+
+# Build the GUI app
+echo "${YELLOW}[6/9] Building macOS application...${NC}"
 pyinstaller --clean --noconfirm TrailCam.spec
+
+# Copy backend executable to Resources (don't bundle it via PyInstaller)
+echo "Copying backend to Resources..."
+cp dist/trailcam_backend "dist/${APP_NAME}.app/Contents/Resources/"
+chmod +x "dist/${APP_NAME}.app/Contents/Resources/trailcam_backend"
 
 echo "${GREEN}✓ App bundle created: dist/${APP_NAME}.app${NC}"
 echo ""
 
 # Create DMG installer
-echo "${YELLOW}[6/8] Creating DMG installer...${NC}"
+echo "${YELLOW}[7/9] Creating DMG installer...${NC}"
 DMG_NAME="TrailCam_Animal_ID_v${VERSION}.dmg"
 DMG_TMP="dist/tmp.dmg"
 
@@ -84,7 +95,7 @@ echo "${GREEN}✓ DMG created: dist/${DMG_NAME}${NC}"
 echo ""
 
 # Create ZIP archive
-echo "${YELLOW}[7/8] Creating ZIP archive...${NC}"
+echo "${YELLOW}[8/9] Creating ZIP archive...${NC}"
 ZIP_NAME="TrailCam_Animal_ID_v${VERSION}.zip"
 cd dist
 zip -r -q "${ZIP_NAME}" "${APP_NAME}.app"
@@ -94,7 +105,7 @@ echo "${GREEN}✓ ZIP created: dist/${ZIP_NAME}${NC}"
 echo ""
 
 # Summary
-echo "${YELLOW}[8/8] Build complete!${NC}"
+echo "${YELLOW}[9/9] Build complete!${NC}"
 echo ""
 echo "========================================"
 echo "Build Summary"

@@ -9,8 +9,10 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 # Collect data files for packages that need them
 datas = [
     ('assets/logo.png', 'assets'),
-    ('video_backend.py', '.'),  # Bundle backend script
 ]
+
+# Don't bundle backend as binary - will copy it manually to Resources after build
+binaries = []
 
 # Collect hidden imports that PyInstaller might miss
 hiddenimports = [
@@ -40,7 +42,7 @@ excludes = [
 a = Analysis(
     ['gui_app.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
