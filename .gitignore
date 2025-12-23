@@ -25,3 +25,7 @@ build/
 .gitattributes
 CLAUDE.md
 .claude
+assets/Trapper*
+.cache
+.gemini*
+plans

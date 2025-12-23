@@ -25,6 +25,38 @@ backend_process = None
 backend_port = None
 
 
+def get_clean_env():
+    """Remove PyInstaller paths from environment for clean subprocess launch.
+
+    macOS SIP strips DYLD_* variables, and PyInstaller pollution can interfere
+    with subprocess library loading. This restores a clean environment.
+
+    Returns:
+        dict: Cleaned environment variables
+    """
+    env = dict(os.environ)
+    meipass = getattr(sys, '_MEIPASS', None)
+
+    if meipass:
+        # macOS: Restore original DYLD variables (before PyInstaller modified them)
+        for key in ['DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH']:
+            orig = env.get(key + '_ORIG')
+            if orig is not None:
+                env[key] = orig
+            else:
+                env.pop(key, None)
+
+        # Remove _MEIPASS from PATH to prevent library conflicts
+        if 'PATH' in env:
+            paths = [p for p in env['PATH'].split(':') if meipass not in p]
+            env['PATH'] = ':'.join(paths)
+
+    # Add backend ready signal
+    env["TRAILCAM_BACKEND_READY"] = "/tmp/trailcam_backend_ready"
+
+    return env
+
+
 def find_backend_script():
     """Find video_backend.py script for development mode.
 
@@ -54,15 +86,24 @@ def find_backend_executable():
         Path to trailcam_backend executable
     """
     # When running from source (after building with PyInstaller)
-    source_exe = Path(__file__).parent / "dist" / "trailcam_backend"
+    source_exe = Path(__file__).parent / "dist" / "TrailCam Animal ID" / "trailcam_backend"
     if source_exe.exists():
         return source_exe
 
-    # When packaged, backend is in Resources folder (copied by build script)
+    # Fallback: old single build location
+    source_exe_old = Path(__file__).parent / "dist" / "trailcam_backend"
+    if source_exe_old.exists():
+        return source_exe_old
+
+    # When packaged with unified spec - backend is sibling to GUI in MacOS folder
     if getattr(sys, 'frozen', False):
-        # Running as packaged app - backend is in the Resources folder
-        bundle_dir = Path(sys.executable).parent.parent  # Go up to Contents
-        backend_exe = bundle_dir / "Resources" / "trailcam_backend"
+        bundle_dir = Path(sys.executable).parent  # MacOS folder
+        backend_exe = bundle_dir / "trailcam_backend"
+        if backend_exe.exists():
+            return backend_exe
+
+        # Fallback: Resources folder (old build method)
+        backend_exe = bundle_dir.parent / "Resources" / "trailcam_backend"
         if backend_exe.exists():
             return backend_exe
 
@@ -109,16 +150,13 @@ def start_backend():
 
         print(f"Logs: /tmp/trailcam_backend.log")
 
-        # Start backend process
+        # Start backend process with cleaned environment
+        # Use get_clean_env() to prevent macOS SIP and PyInstaller path pollution
         backend_process = subprocess.Popen(
             cmd,
             stdout=log_file,
             stderr=log_file,
-            env={
-                **os.environ,
-                "TRAILCAM_BACKEND_READY": "/tmp/trailcam_backend_ready"
-            },
-            start_new_session=True  # Daemonize properly
+            env=get_clean_env()
         )
 
         # Wait for backend to signal ready and write port (max 10 seconds)

@@ -52,9 +52,21 @@ def normalize_label(raw_label: str) -> str:
 
 
 def ensure_model_path() -> str:
+    """Find the model file, looking in the bundle if packaged."""
+    # If running in a packaged app (frozen), the model is in the temp dir
+    if getattr(sys, 'frozen', False):
+        # sys._MEIPASS is the path to the temp folder created by PyInstaller
+        base_path = sys._MEIPASS
+        model_path = Path(base_path) / MODEL_FILENAME
+        if model_path.exists():
+            return str(model_path)
+
+    # For development or as a fallback, check current dir
     local_path = Path(MODEL_FILENAME)
     if local_path.exists():
         return str(local_path)
+
+    # Finally, for developers, download it if not found locally
     return hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILENAME)
 
 

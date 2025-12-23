@@ -7,24 +7,34 @@ This ensures the __main__ block in video_backend.py executes properly.
 if __name__ == "__main__":
     import sys
     import os
-    import socket
     from datetime import datetime
+    import traceback
 
     # Always write to log file for debugging
+    log_file_path = "/tmp/trailcam_backend.log"
+    crash_log_path = "/tmp/trailcam_backend_CRASH.log"
+    
     try:
-        log_file_obj = open("/tmp/trailcam_backend.log", "w", buffering=1)
+        log_file_obj = open(log_file_path, "w", buffering=1)
         sys.stdout = log_file_obj
         sys.stderr = log_file_obj
         print("=== Log file opened successfully ===", flush=True)
     except Exception as e:
-        # If we can't open log, write error to a different file
-        with open("/tmp/trailcam_backend_ERROR.txt", "w") as f:
-            f.write(f"Failed to open log: {e}\n")
+        # If we can't open log, we can't do much, but let's try to report it.
+        # This is a last-ditch effort.
+        with open(crash_log_path, "w") as f:
+            f.write(f"FATAL: Failed to open main log file {log_file_path}: {e}\n")
+        sys.exit(1)
 
     try:
         # Import and run the backend
+        print("Importing socket...", flush=True)
+        import socket
+        print("Importing video_backend...", flush=True)
         import video_backend
+        print("Importing uvicorn...", flush=True)
         import uvicorn
+        print("Imports successful.", flush=True)
 
         # Print diagnostics
         print(f"=== TrailCam Video Backend ===", flush=True)
@@ -59,9 +69,10 @@ if __name__ == "__main__":
         uvicorn.run(video_backend.app, host="127.0.0.1", port=port, log_level="info")
 
     except Exception as e:
-        print(f"FATAL ERROR: {e}", flush=True)
-        import traceback
+        print(f"FATAL ERROR during backend startup: {e}", flush=True)
         traceback.print_exc()
-        with open("/tmp/trailcam_backend_CRASH.txt", "w") as f:
-            f.write(f"Backend crashed: {e}\n")
+        # Also write to a separate crash file for easy access
+        with open(crash_log_path, "w") as f:
+            f.write(f"Backend crashed during startup: {e}\n\n")
             traceback.print_exc(file=f)
+        sys.exit(1)

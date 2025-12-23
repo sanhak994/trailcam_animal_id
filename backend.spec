@@ -8,7 +8,9 @@ a = Analysis(
     ['backend_main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        ('assets/TrapperAI-v02.2024-YOLOv8-m.pt', '.')
+    ],
     hiddenimports=[
         'video_backend',  # Explicitly include the backend module
         'uvicorn.logging',
@@ -21,6 +23,13 @@ a = Analysis(
         'uvicorn.protocols.websockets.auto',
         'uvicorn.lifespan',
         'uvicorn.lifespan.on',
+        # Add-ins for Uvicorn stability
+        'httptools',
+        'uvloop',
+        'websockets',
+        # Add-ins for core scientific packages
+        'cv2',
+        'torch',
     ],
     hookspath=[],
     hooksconfig={},
@@ -51,4 +60,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    mac_sdk_roots=["/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"],
 )

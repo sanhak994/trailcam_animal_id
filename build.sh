@@ -61,22 +61,24 @@ pip install --upgrade pyinstaller > /dev/null 2>&1
 echo "${GREEN}✓ Build tools ready${NC}"
 echo ""
 
-# Build the backend executable first
-echo "${YELLOW}[5/9] Building backend executable...${NC}"
-pyinstaller --clean --noconfirm backend.spec
-echo "${GREEN}✓ Backend executable created: dist/trailcam_backend${NC}"
-echo ""
-
-# Build the GUI app
-echo "${YELLOW}[6/9] Building macOS application...${NC}"
-pyinstaller --clean --noconfirm TrailCam.spec
-
-# Copy backend executable to Resources (don't bundle it via PyInstaller)
-echo "Copying backend to Resources..."
-cp dist/trailcam_backend "dist/${APP_NAME}.app/Contents/Resources/"
-chmod +x "dist/${APP_NAME}.app/Contents/Resources/trailcam_backend"
+# Build using unified spec (includes both GUI and backend)
+echo "${YELLOW}[5/9] Building unified macOS application...${NC}"
+pyinstaller --clean --noconfirm unified.spec
 
 echo "${GREEN}✓ App bundle created: dist/${APP_NAME}.app${NC}"
+echo "${GREEN}✓ Backend included: dist/${APP_NAME}.app/Contents/MacOS/trailcam_backend${NC}"
+echo ""
+
+# Sign the entire application bundle for macOS Gatekeeper
+echo "${YELLOW}[6/9] Signing application bundle...${NC}"
+APP_BUNDLE_PATH="dist/${APP_NAME}.app"
+SIGNING_IDENTITY="-" # Ad-hoc signature, no developer account needed
+
+# Use --deep to recursively sign the entire bundle. This is the most effective
+# way to resolve "Team ID" mismatches with bundled frameworks like Python.
+codesign --force --deep --sign "${SIGNING_IDENTITY}" "${APP_BUNDLE_PATH}"
+
+echo "${GREEN}✓ Application bundle signed${NC}"
 echo ""
 
 # Create DMG installer
