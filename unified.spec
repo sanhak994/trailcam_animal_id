@@ -10,7 +10,14 @@ a_gui = Analysis(
     ['gui_app.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets/logo.png', 'assets')],
+    datas=[
+        ('assets/logo.png', 'assets'),
+        # Bundle pipeline scripts for packaged app
+        ('run_pipeline.py', '.'),
+        ('extract_frames.py', '.'),
+        ('classify_frames.py', '.'),
+        ('summarize_videos.py', '.'),
+    ],
     hiddenimports=[
         'tkinter',
         'tkinter.messagebox',
@@ -34,7 +41,10 @@ a_backend = Analysis(
     ['backend_main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        # Bundle ML model for offline operation
+        ('assets/TrapperAI-v02.2024-YOLOv8-m.pt', '.'),
+    ],
     hiddenimports=[
         'video_backend',
         'uvicorn.logging',

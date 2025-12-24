@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 Entry point for the packaged backend executable.
-This ensures the __main__ block in video_backend.py executes properly.
+Can run in two modes:
+1. Server mode: Start uvicorn backend (default)
+2. Script mode: Run pipeline scripts (when script path provided)
 """
 
 if __name__ == "__main__":
@@ -10,6 +12,44 @@ if __name__ == "__main__":
     from datetime import datetime
     import traceback
 
+    # Check if we're being called to run a script instead of the server
+    # Command format: ./trailcam_backend script.py --arg1 --arg2
+    if len(sys.argv) > 1 and sys.argv[1].endswith('.py'):
+        # Script mode: Import and run the specified script
+        script_path = sys.argv[1]
+        script_name = os.path.basename(script_path).replace('.py', '')
+
+        # Update sys.argv to make it look like we're running the script directly
+        sys.argv = sys.argv[1:]
+
+        try:
+            # Import and run the script
+            if script_name == 'run_pipeline':
+                import run_pipeline
+                run_pipeline.main()
+            elif script_name == 'extract_frames':
+                import extract_frames
+                extract_frames.main()
+            elif script_name == 'classify_frames':
+                import classify_frames
+                classify_frames.main()
+            elif script_name == 'summarize_videos':
+                import summarize_videos
+                summarize_videos.main()
+            else:
+                print(f"Unknown script: {script_name}")
+                sys.exit(1)
+        except SystemExit as e:
+            sys.exit(e.code if isinstance(e.code, int) else 1)
+        except Exception as e:
+            print(f"Error running {script_name}: {e}")
+            traceback.print_exc()
+            sys.exit(1)
+
+        # Script completed normally
+        sys.exit(0)
+
+    # Server mode: Start uvicorn backend (existing code below)
     # Always write to log file for debugging
     log_file_path = "/tmp/trailcam_backend.log"
     crash_log_path = "/tmp/trailcam_backend_CRASH.log"

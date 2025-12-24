@@ -5,6 +5,7 @@ import argparse
 import concurrent.futures as futures
 import csv
 import os
+import sys
 import threading
 from pathlib import Path
 from typing import List, Sequence, Tuple
@@ -154,8 +155,12 @@ def main():
     rows: List[Tuple[str, str, bool]] = []
     with futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
         future_map = {executor.submit(predict_frame, frame, device): frame for frame in frames}
-        for future in tqdm(futures.as_completed(future_map), total=len(future_map), desc="Classifying frames"):
-            rows.append(future.result())
+
+        # Use tqdm as context manager to ensure proper cleanup
+        with tqdm(total=len(future_map), desc="Classifying frames") as pbar:
+            for future in futures.as_completed(future_map):
+                rows.append(future.result())  # Properly consume future
+                pbar.update(1)
 
     out_path = output_dir/"animal_predictions.csv"
     with out_path.open("w", newline="") as f:
