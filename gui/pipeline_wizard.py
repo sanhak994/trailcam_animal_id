@@ -495,7 +495,7 @@ class PipelineWizard(ctk.CTkToplevel):
         # Run pipeline
         self.runner = ProcessRunner(
             log_callback=self._append_log,
-            progress_callback=lambda x: None,
+            progress_callback=self._update_progress,
             completion_callback=self._on_pipeline_complete
         )
         self.runner.run(cmd)
@@ -504,6 +504,33 @@ class PipelineWizard(ctk.CTkToplevel):
         """Append text to log."""
         self.log_text.insert("end", text + "\n")
         self.log_text.see("end")
+
+    def _update_progress(self, line: str):
+        """Parse tqdm progress from output and update GUI progress bar."""
+        import re
+
+        # Parse tqdm format: "Extracting frames: 45%|████▌     | 9/20 [00:15<00:18, 0.60it/s]"
+        # Look for percentage pattern: "XX%|" or "X/Y" pattern
+
+        # Try percentage match first
+        pct_match = re.search(r'(\d+)%', line)
+        if pct_match:
+            progress = int(pct_match.group(1)) / 100.0
+            self._set_progress_safe(progress)
+            return
+
+        # Try fraction match: "X/Y"
+        frac_match = re.search(r'(\d+)/(\d+)', line)
+        if frac_match:
+            current = int(frac_match.group(1))
+            total = int(frac_match.group(2))
+            if total > 0:
+                progress = current / total
+                self._set_progress_safe(progress)
+
+    def _set_progress_safe(self, value: float):
+        """Thread-safe progress bar update."""
+        self.progress_bar.after(0, lambda: self.progress_bar.set(value))
 
     def _cancel_pipeline(self):
         """Cancel running pipeline."""

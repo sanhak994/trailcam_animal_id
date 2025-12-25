@@ -175,8 +175,8 @@ class ReviewTab:
         self.clip_list_frame = ctk.CTkScrollableFrame(left_frame, width=220, fg_color=COLORS['bg_secondary'])
         self.clip_list_frame.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="nsew")
 
-        # Bind mouse wheel events for trackpad scrolling
-        self._bind_mousewheel(self.clip_list_frame)
+        # CTkScrollableFrame handles mouse wheel scrolling automatically
+        # Custom bindings removed to fix scrolling issues
 
         # === RIGHT SIDE: Video Display and Controls ===
         right_frame = ctk.CTkFrame(main_frame, fg_color=COLORS['bg_primary'])
@@ -511,13 +511,8 @@ class ReviewTab:
             for idx, clip in enumerate(self.clips):
                 self._create_clip_button(idx, clip)
 
-            # Bind scroll events to dynamically created clip widgets
-            for clip in self.clips:
-                if 'frame_widget' in clip:
-                    self._bind_mousewheel(clip['frame_widget'])
-
-            # Also rebind to the list frame itself
-            self._bind_mousewheel(self.clip_list_frame)
+            # CTkScrollableFrame handles scrolling automatically
+            # Custom mousewheel bindings removed
 
             # Auto-play first clip
             self._play_clip(0)
@@ -605,6 +600,8 @@ class ReviewTab:
             if 'frame_widget' in c and c['frame_widget'].winfo_exists():
                 if i == index:
                     c['frame_widget'].configure(fg_color=COLORS['accent_active'])
+                    # Scroll the highlighted clip into view
+                    self._scroll_clip_into_view(c['frame_widget'])
                 else:
                     c['frame_widget'].configure(fg_color=COLORS['ui_button'])
 
@@ -642,6 +639,41 @@ class ReviewTab:
         finally:
             # Clear layout flag immediately (blocking operations already done)
             self.layout_in_progress = False
+
+    def _scroll_clip_into_view(self, clip_widget):
+        """Scroll the clips list to make the given clip widget visible."""
+        try:
+            # Get the scrollable frame's canvas
+            canvas = self.clip_list_frame._parent_canvas
+
+            # Get widget's position relative to the scrollable frame
+            widget_y = clip_widget.winfo_y()
+            widget_height = clip_widget.winfo_height()
+
+            # Get visible area bounds
+            canvas_height = canvas.winfo_height()
+            scroll_region = canvas.cget("scrollregion").split()
+            if len(scroll_region) == 4:
+                total_height = float(scroll_region[3])
+            else:
+                return
+
+            # Calculate current viewport
+            yview = canvas.yview()
+            visible_top = yview[0] * total_height
+            visible_bottom = yview[1] * total_height
+
+            # Check if widget is outside visible area
+            if widget_y < visible_top:
+                # Scroll up to show widget at top
+                canvas.yview_moveto(widget_y / total_height)
+            elif widget_y + widget_height > visible_bottom:
+                # Scroll down to show widget at bottom
+                target = (widget_y + widget_height - canvas_height) / total_height
+                canvas.yview_moveto(max(0, target))
+        except (AttributeError, ValueError, ZeroDivisionError):
+            # If scroll fails, it's not critical - clip is highlighted anyway
+            pass
 
     def _update_frame(self, ctk_image):
         """Thread-safe callback to update video frame."""
@@ -911,53 +943,12 @@ class ReviewTab:
             # Cancel auto-hide timer and show controls
             self._cancel_auto_hide_timer()
 
-    def _bind_mousewheel(self, widget):
-        """Bind mouse wheel events for scrolling - platform aware."""
-        system = platform.system()
-
-        if system == "Darwin":  # macOS
-            widget.bind("<MouseWheel>", self._on_mousewheel_mac)
-            # Also try to bind to the canvas directly for better compatibility
-            try:
-                canvas = widget._parent_canvas
-                canvas.bind("<MouseWheel>", self._on_mousewheel_mac)
-            except AttributeError:
-                pass
-        elif system == "Windows":
-            widget.bind("<MouseWheel>", self._on_mousewheel)
-        else:  # Linux
-            widget.bind("<Button-4>", lambda e: self._on_mousewheel_linux(e, -1))
-            widget.bind("<Button-5>", lambda e: self._on_mousewheel_linux(e, 1))
-
-        # Also bind to children for better event capture
-        for child in widget.winfo_children():
-            if system == "Darwin":
-                child.bind("<MouseWheel>", self._on_mousewheel_mac)
-            elif system == "Windows":
-                child.bind("<MouseWheel>", self._on_mousewheel)
-            else:  # Linux
-                child.bind("<Button-4>", lambda e: self._on_mousewheel_linux(e, -1))
-                child.bind("<Button-5>", lambda e: self._on_mousewheel_linux(e, 1))
-
-    def _on_mousewheel(self, event):
-        """Handle Windows mouse wheel scroll event."""
-        # Get the canvas from CTkScrollableFrame
-        canvas = self.clip_list_frame._parent_canvas
-        canvas.yview_scroll(-1 * int(event.delta / 120), "units")
-
-    def _on_mousewheel_mac(self, event):
-        """Handle macOS trackpad scroll event."""
-        # macOS delta is different - no division needed
-        try:
-            canvas = self.clip_list_frame._parent_canvas
-            canvas.yview_scroll(-1 * event.delta, "units")
-        except AttributeError:
-            pass
-
-    def _on_mousewheel_linux(self, event, direction):
-        """Handle Linux mouse wheel events."""
-        canvas = self.clip_list_frame._parent_canvas
-        canvas.yview_scroll(direction, "units")
+    # Custom mousewheel bindings removed - CTkScrollableFrame handles scrolling automatically
+    # The following methods are commented out as they interfered with native scrolling:
+    # - _bind_mousewheel()
+    # - _on_mousewheel()
+    # - _on_mousewheel_mac()
+    # - _on_mousewheel_linux()
 
     def _on_search_changed(self, *args):
         """Filter clip list based on search text."""
