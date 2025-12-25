@@ -11,26 +11,6 @@ from gui.config import (
 )
 
 
-def get_script_path(script_name):
-    """Find script in bundled app or development environment.
-
-    Args:
-        script_name: Name of the script file (e.g., 'run_pipeline.py')
-
-    Returns:
-        Full path to the script
-    """
-    if getattr(sys, 'frozen', False):
-        # Running in packaged app - scripts are in _MEIPASS temp dir
-        base_path = sys._MEIPASS
-        script_path = Path(base_path) / script_name
-        if script_path.exists():
-            return str(script_path)
-
-    # Development mode - scripts are in project root
-    return script_name
-
-
 class PipelineWizard(ctk.CTkToplevel):
     """Full-featured wizard for pipeline setup and execution."""
 
@@ -488,20 +468,13 @@ class PipelineWizard(ctk.CTkToplevel):
             self._append_log(f"Error creating directories: {e}")
             return
 
-        # Build command - handle frozen vs development mode
-        if getattr(sys, 'frozen', False):
-            # Packaged app - run script directly (PyInstaller's Python will execute it)
-            cmd = [
-                get_script_path("run_pipeline.py"),
-            ]
-        else:
-            # Development - use Python interpreter explicitly
-            cmd = [
-                sys.executable,
-                get_script_path("run_pipeline.py"),
-            ]
+        # Build command
+        cmd = [
+            sys.executable,
+            "run_pipeline.py",
+        ]
 
-        # Add arguments (same for both modes)
+        # Add arguments
         cmd.extend([
             "--clips_dir", self.clips_dir_var.get(),
             "--frames_dir", self.frames_dir_var.get(),

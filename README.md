@@ -14,31 +14,10 @@ A way to quickly id animals on trailcam footage and review clips with annotation
 
 ## Getting Started
 
-### For macOS Users (Recommended)
-- Tested with MacOS Tahoe 26.1 and Python 3.14.2
+### Installation
 
-**Quick Install (choose one):**
+Tested with macOS Sequoia 15.2 and Python 3.9+
 
-**Option A: DMG File**
-1. Download `TrailCam_Animal_ID_v1.0.0.dmg` from [Releases](https://github.com/MoonMayne/trailcam_animal_id/releases)
-2. Double-click to mount the DMG
-3. Drag "TrailCam Animal ID" to your Applications folder
-4. Eject the DMG
-5. Launch from Applications or Spotlight search
-6. **First launch:** Right-click → Open (to bypass Gatekeeper warning)
-
-**Option B: ZIP File**
-1. Download `TrailCam_Animal_ID_v1.0.0.zip` from [Releases](https://github.com/MoonMayne/trailcam_animal_id/releases)
-2. Double-click to unzip
-3. Drag "TrailCam Animal ID.app" to your Applications folder
-4. Launch from Applications or Spotlight search
-5. **First launch:** Right-click → Open (to bypass Gatekeeper warning)
-
-The app will download the AI model (>50MB) on first run.
-
-### For Developers
-
-**Installation:**
 ```bash
 # Clone the repository
 git clone https://github.com/MoonMayne/trailcam_animal_id.git
@@ -46,25 +25,41 @@ cd trailcam_animal_id
 
 # Create virtual environment
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+```
 
-# Launch the app
+### Running the Application
+
+```bash
+# Activate virtual environment (if not already active)
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Launch the GUI application
 python3 gui_app.py
 ```
 
-**Building from Source:**
+The AI model (~250MB) will download automatically on first run from HuggingFace.
+
+### Optional: Convenience Launcher
+
+**For macOS/Linux (launch.sh):**
 ```bash
-# Install build dependencies
-pip install py2app
+#!/bin/bash
+cd "$(dirname "$0")"
+source venv/bin/activate
+python3 gui_app.py
+```
+Make it executable: `chmod +x launch.sh`
 
-# Run build script
-./build.sh
-
-# Find your app in dist/ folder
-open dist/
+**For Windows (launch.bat):**
+```batch
+@echo off
+cd /d "%~dp0"
+call venv\Scripts\activate
+python gui_app.py
 ```
 
 ---
@@ -228,17 +223,19 @@ python3 gui_app.py
 ```
 trailcam_animal_id/
 ├── gui_app.py              # Main entry point
+├── video_backend.py        # FastAPI backend for video streaming
 ├── gui/                    # GUI modules
+│   ├── main_window.py      # Main application window
+│   ├── pipeline_tab.py     # Pipeline configuration tab
+│   ├── pipeline_wizard.py  # New analysis wizard
+│   ├── review_tab.py       # Video review interface
+│   ├── process_runner.py   # Subprocess management
+│   └── config.py           # UI configuration
 ├── assets/                 # Icons and resources
 ├── extract_frames.py       # Frame extraction
 ├── classify_frames.py      # AI inference
 ├── summarize_videos.py     # CSV aggregation
-├── review_clips.py         # CLI reviewer
-├── run_pipeline.py         # Orchestrator
-├── requirements.txt        # Python dependencies
-├── setup.py               # Packaging configuration
-└── build.sh               # Build script
+├── review_clips.py         # CLI reviewer (legacy)
+├── run_pipeline.py         # Pipeline orchestrator
+└── requirements.txt        # Python dependencies
 ```
-
-### Building the App
-See **Getting Started → For Developers → Building from Source** above.

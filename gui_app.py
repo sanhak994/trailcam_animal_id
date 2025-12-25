@@ -26,39 +26,18 @@ backend_port = None
 
 
 def get_clean_env():
-    """Remove PyInstaller paths from environment for clean subprocess launch.
-
-    macOS SIP strips DYLD_* variables, and PyInstaller pollution can interfere
-    with subprocess library loading. This restores a clean environment.
+    """Get environment with backend ready signal.
 
     Returns:
-        dict: Cleaned environment variables
+        dict: Environment variables with backend ready signal path
     """
     env = dict(os.environ)
-    meipass = getattr(sys, '_MEIPASS', None)
-
-    if meipass:
-        # macOS: Restore original DYLD variables (before PyInstaller modified them)
-        for key in ['DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH']:
-            orig = env.get(key + '_ORIG')
-            if orig is not None:
-                env[key] = orig
-            else:
-                env.pop(key, None)
-
-        # Remove _MEIPASS from PATH to prevent library conflicts
-        if 'PATH' in env:
-            paths = [p for p in env['PATH'].split(':') if meipass not in p]
-            env['PATH'] = ':'.join(paths)
-
-    # Add backend ready signal
     env["TRAILCAM_BACKEND_READY"] = "/tmp/trailcam_backend_ready"
-
     return env
 
 
 def find_backend_script():
-    """Find video_backend.py script for development mode.
+    """Find video_backend.py script.
 
     Returns:
         Path to video_backend.py
@@ -67,50 +46,6 @@ def find_backend_script():
     if script_path.exists():
         return script_path
     raise FileNotFoundError("Could not find video_backend.py")
-
-
-def find_python():
-    """Find Python executable for development mode.
-
-    Returns:
-        Path to Python executable (current interpreter with all deps)
-    """
-    # When running from source, use current Python (has all deps in venv)
-    return sys.executable
-
-
-def find_backend_executable():
-    """Find the backend executable for production mode.
-
-    Returns:
-        Path to trailcam_backend executable
-    """
-    # When running from source (after building with PyInstaller)
-    source_exe = Path(__file__).parent / "dist" / "TrailCam Animal ID" / "trailcam_backend"
-    if source_exe.exists():
-        return source_exe
-
-    # Fallback: old single build location
-    source_exe_old = Path(__file__).parent / "dist" / "trailcam_backend"
-    if source_exe_old.exists():
-        return source_exe_old
-
-    # When packaged with unified spec - backend is sibling to GUI in MacOS folder
-    if getattr(sys, 'frozen', False):
-        bundle_dir = Path(sys.executable).parent  # MacOS folder
-        backend_exe = bundle_dir / "trailcam_backend"
-        if backend_exe.exists():
-            return backend_exe
-
-        # Fallback: Resources folder (old build method)
-        backend_exe = bundle_dir.parent / "Resources" / "trailcam_backend"
-        if backend_exe.exists():
-            return backend_exe
-
-    raise FileNotFoundError(
-        "Could not find backend executable.\n\n"
-        "Please run: ./build.sh"
-    )
 
 
 def start_backend():
@@ -135,23 +70,13 @@ def start_backend():
         # Open log file for backend output
         log_file = open("/tmp/trailcam_backend.log", "w")
 
-        # Choose backend launch method based on mode
-        if getattr(sys, 'frozen', False):
-            # Production: use bundled executable
-            backend_exe = find_backend_executable()
-            cmd = [str(backend_exe)]
-            print(f"Starting backend executable: {backend_exe}")
-        else:
-            # Development: use Python script
-            backend_script = find_backend_script()
-            python_cmd = find_python()
-            cmd = [python_cmd, str(backend_script)]
-            print(f"Starting backend via Python: {python_cmd} {backend_script}")
-
+        # Launch backend via Python
+        backend_script = find_backend_script()
+        cmd = [sys.executable, str(backend_script)]
+        print(f"Starting backend: {sys.executable} {backend_script}")
         print(f"Logs: /tmp/trailcam_backend.log")
 
-        # Start backend process with cleaned environment
-        # Use get_clean_env() to prevent macOS SIP and PyInstaller path pollution
+        # Start backend process with environment
         backend_process = subprocess.Popen(
             cmd,
             stdout=log_file,
