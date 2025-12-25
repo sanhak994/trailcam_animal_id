@@ -14,30 +14,34 @@ BODY_FONT = {"family": FONT_FAMILY, "size": 13, "weight": "normal"}
 SMALL_FONT = {"family": FONT_FAMILY, "size": 11, "weight": "normal"}
 MONO_FONT = {"family": FONT_FAMILY_MONO, "size": 11, "weight": "normal"}
 
-# Professional Video Editor Color Palette
-# True black backgrounds like Premiere Pro, Final Cut Pro, DaVinci Resolve
+# Neon Cyberpunk Color Palette
+# Dark foundations with neon teal accents
 COLORS = {
-    # Backgrounds (true black like professional video editors)
+    # Backgrounds (true black cyberpunk foundation)
     'bg_primary': '#000000',        # True black - main background
     'bg_secondary': '#0a0a0a',      # Near black - panels
     'bg_tertiary': '#1a1a1a',       # Dark gray - elevated elements
 
-    # UI Elements
-    'ui_button': '#2a2a2a',         # Button background
-    'ui_button_hover': '#3a3a3a',   # Button hover
-    'ui_input': '#1a1a1a',          # Input fields
-    'ui_frame': '#0a0a0a',          # Frame backgrounds
+    # UI Elements - consistent dark + grey border pattern
+    'ui_button': '#000000',         # Black background (changed from #2a2a2a)
+    'ui_button_hover': '#000000',   # Stay black on hover (border glows instead)
+    'ui_input': '#000000',          # Black background for inputs
+    'ui_frame': '#000000',          # Black background for frames
+    'ui_border': '#2a2a2a',         # Subtle grey border (default)
+    'ui_border_hover': '#00ffcc',   # Neon teal border on hover
 
     # Text Colors
     'text_primary': '#e0e0e0',      # Primary text (light gray)
     'text_secondary': '#9a9a9a',    # Secondary text (medium gray)
     'text_disabled': '#5a5a5a',     # Disabled text (dark gray)
 
-    # Accents (semantic colors for UX)
-    'accent_active': '#2d5a2d',     # Active/selected (dark green)
-    'accent_active_hover': '#3a7a3a',
-    'accent_danger': '#8b0000',     # Danger/delete (dark red)
-    'accent_danger_hover': '#a52a2a',
+    # Accents - NEON CYBERPUNK
+    'accent_neon': '#00ffcc',        # Neon teal (primary accent)
+    'accent_active': '#00ffcc',      # Active/selected (neon teal)
+    'accent_active_hover': '#00ffcc', # Hover state (same - only border changes)
+    'accent_progress': '#00d9ff',    # Progress bar (slightly different teal)
+    'accent_danger': '#ff3366',      # Danger/delete (neon pink-red)
+    'accent_danger_hover': '#ff4477', # Hover state
 
     # Video Display
     'video_bg': '#000000',          # Pure black for video area

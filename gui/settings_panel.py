@@ -32,7 +32,7 @@ class SettingsPanelModal(ctk.CTkToplevel):
         self.grab_set()
 
         # Set appearance
-        self.configure(fg_color=COLORS['bg_secondary'])
+        self.configure(fg_color=COLORS['bg_primary'])
 
         # Create content
         self._create_widgets()
@@ -46,7 +46,7 @@ class SettingsPanelModal(ctk.CTkToplevel):
     def _create_widgets(self):
         """Create modal content."""
         # Header with logo
-        header_frame = ctk.CTkFrame(self, fg_color=COLORS['bg_secondary'])
+        header_frame = ctk.CTkFrame(self, fg_color=COLORS['bg_primary'])
         header_frame.pack(fill="x", pady=0)
 
         # Load and display logo
@@ -129,7 +129,8 @@ class SettingsPanelModal(ctk.CTkToplevel):
             border_color=COLORS['text_secondary'],
             border_width=1,
             text_color=COLORS['text_primary'],
-            checkmark_color=COLORS['bg_primary']
+            checkmark_color=COLORS['bg_primary'],
+            hover_color=COLORS['accent_neon']
         )
         auto_play_checkbox.pack(side="left", padx=10)
 
@@ -189,7 +190,8 @@ class SettingsPanelModal(ctk.CTkToplevel):
             border_color=COLORS['text_secondary'],
             border_width=1,
             text_color=COLORS['text_primary'],
-            checkmark_color=COLORS['bg_primary']
+            checkmark_color=COLORS['bg_primary'],
+            hover_color=COLORS['accent_neon']
         )
         shortcuts_checkbox.pack(side="left", padx=10)
 

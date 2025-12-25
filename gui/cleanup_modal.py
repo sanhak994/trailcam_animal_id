@@ -24,7 +24,7 @@ class CleanupModal(ctk.CTkToplevel):
         self.grab_set()
 
         # Set appearance
-        self.configure(fg_color=COLORS['bg_secondary'])
+        self.configure(fg_color=COLORS['bg_primary'])
 
         # Store clips directory
         self.clips_dir = Path(clips_dir)
@@ -63,44 +63,50 @@ class CleanupModal(ctk.CTkToplevel):
         self.info_label.pack(padx=20, pady=20, fill="both", expand=True)
 
         # Buttons frame
-        button_frame = ctk.CTkFrame(self, fg_color=COLORS['bg_secondary'])
+        button_frame = ctk.CTkFrame(self, fg_color=COLORS['bg_primary'])
         button_frame.pack(padx=30, pady=(0, 20))
 
-        ctk.CTkButton(
+        refresh_btn = ctk.CTkButton(
             button_frame,
             text="Refresh Info",
             command=self._refresh_info,
             width=150,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(side="left", padx=5)
+            text_color=COLORS['text_primary']
+        )
+        refresh_btn.pack(side="left", padx=5)
+        refresh_btn.bind("<Enter>", lambda e: refresh_btn.configure(border_color=COLORS['ui_border_hover']))
+        refresh_btn.bind("<Leave>", lambda e: refresh_btn.configure(border_color=COLORS['ui_border']))
 
-        ctk.CTkButton(
+        finder_btn = ctk.CTkButton(
             button_frame,
             text="Open in Finder",
             command=self._open_in_finder,
             width=150,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(side="left", padx=5)
+            text_color=COLORS['text_primary']
+        )
+        finder_btn.pack(side="left", padx=5)
+        finder_btn.bind("<Enter>", lambda e: finder_btn.configure(border_color=COLORS['ui_border_hover']))
+        finder_btn.bind("<Leave>", lambda e: finder_btn.configure(border_color=COLORS['ui_border']))
 
-        ctk.CTkButton(
+        delete_btn = ctk.CTkButton(
             button_frame,
             text="Delete All Outputs",
             command=self._delete_outputs,
             width=150,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['accent_danger'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_danger']
-        ).pack(side="left", padx=5)
+            text_color=COLORS['text_primary']
+        )
+        delete_btn.pack(side="left", padx=5)
+        delete_btn.bind("<Enter>", lambda e: delete_btn.configure(border_color=COLORS['accent_danger']))
+        delete_btn.bind("<Leave>", lambda e: delete_btn.configure(border_color=COLORS['ui_border']))
 
         # Close instruction
         ctk.CTkLabel(

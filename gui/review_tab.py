@@ -83,7 +83,7 @@ class ReviewTab:
         main_frame.grid_rowconfigure(0, weight=1)
 
         # === LEFT SIDE: Clip List ===
-        left_frame = ctk.CTkFrame(main_frame, fg_color=COLORS['bg_secondary'])
+        left_frame = ctk.CTkFrame(main_frame, fg_color=COLORS['bg_primary'])
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 3))
         self.left_frame = left_frame  # Store reference for sidebar collapse
 
@@ -119,7 +119,8 @@ class ReviewTab:
             textvariable=self.search_var,
             width=170,
             fg_color=COLORS['ui_input'],
-            border_color=COLORS['ui_frame']
+            border_color=COLORS['ui_border'],
+            border_width=1
         )
         self.search_entry.pack(side="left", fill="x", expand=True)
 
@@ -130,13 +131,16 @@ class ReviewTab:
             width=70,
             command=self._on_search_changed,
             font=ctk.CTkFont(**BODY_FONT),
-            fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            fg_color=COLORS['ui_button'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
+            text_color=COLORS['text_primary']
         )
         search_btn.pack(side="left", padx=(5, 0))
+
+        # Hover effects - only border glows
+        search_btn.bind("<Enter>", lambda e: search_btn.configure(border_color=COLORS['ui_border_hover']))
+        search_btn.bind("<Leave>", lambda e: search_btn.configure(border_color=COLORS['ui_border']))
 
         # Clear button
         clear_btn = ctk.CTkButton(
@@ -145,13 +149,16 @@ class ReviewTab:
             width=60,
             command=self._clear_search,
             font=ctk.CTkFont(**BODY_FONT),
-            fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            fg_color=COLORS['ui_button'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
+            text_color=COLORS['text_primary']
         )
         clear_btn.pack(side="left", padx=(5, 0))
+
+        # Hover effects - only border glows
+        clear_btn.bind("<Enter>", lambda e: clear_btn.configure(border_color=COLORS['ui_border_hover']))
+        clear_btn.bind("<Leave>", lambda e: clear_btn.configure(border_color=COLORS['ui_border']))
 
         # Bottom row: match count
         self.match_count_label = ctk.CTkLabel(
@@ -172,11 +179,11 @@ class ReviewTab:
         self.search_entry.bind("<FocusOut>", self._on_search_focus_out)
 
         # Scrollable clip list
-        self.clip_list_frame = ctk.CTkScrollableFrame(left_frame, width=220, fg_color=COLORS['bg_secondary'])
+        self.clip_list_frame = ctk.CTkScrollableFrame(left_frame, width=220, fg_color=COLORS['bg_primary'])
         self.clip_list_frame.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="nsew")
 
-        # CTkScrollableFrame handles mouse wheel scrolling automatically
-        # Custom bindings removed to fix scrolling issues
+        # Setup macOS trackpad scrolling
+        self._setup_macos_scrolling()
 
         # === RIGHT SIDE: Video Display and Controls ===
         right_frame = ctk.CTkFrame(main_frame, fg_color=COLORS['bg_primary'])
@@ -200,34 +207,42 @@ class ReviewTab:
         ).pack(side="left")
 
         # Settings gear icon button
-        ctk.CTkButton(
+        settings_btn = ctk.CTkButton(
             title_frame,
             text="⚙",
             width=40,
             height=30,
             command=self._show_settings_panel,
             font=ctk.CTkFont(size=18),
-            fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            fg_color=COLORS['ui_button'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(side="right", padx=(5, 0))
+            text_color=COLORS['text_primary']
+        )
+        settings_btn.pack(side="right", padx=(5, 0))
+
+        # Hover effects - only border glows
+        settings_btn.bind("<Enter>", lambda e: settings_btn.configure(border_color=COLORS['ui_border_hover']))
+        settings_btn.bind("<Leave>", lambda e: settings_btn.configure(border_color=COLORS['ui_border']))
 
         # Advanced menu button
-        ctk.CTkButton(
+        adv_btn = ctk.CTkButton(
             title_frame,
             text="≡",
             width=40,
             height=30,
             command=self._show_advanced_menu,
             font=ctk.CTkFont(size=20),
-            fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            fg_color=COLORS['ui_button'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(side="right")
+            text_color=COLORS['text_primary']
+        )
+        adv_btn.pack(side="right")
+
+        # Hover effects - only border glows
+        adv_btn.bind("<Enter>", lambda e: adv_btn.configure(border_color=COLORS['ui_border_hover']))
+        adv_btn.bind("<Leave>", lambda e: adv_btn.configure(border_color=COLORS['ui_border']))
 
         # Video container (holds video and overlay controls)
         video_container = ctk.CTkFrame(right_frame, fg_color=COLORS['video_bg'])
@@ -267,18 +282,18 @@ class ReviewTab:
         # Controls overlay (bottom of video container)
         controls_overlay = ctk.CTkFrame(
             video_container,
-            fg_color=COLORS['bg_tertiary'],  # Dark gray overlay
+            fg_color=COLORS['bg_primary'],  # Pure black background
             height=80
         )
         controls_overlay.grid(row=1, column=0, sticky="ew")
         self.controls_overlay = controls_overlay  # Store reference
 
         # Control buttons inside overlay (circular icon buttons)
-        controls_inner = ctk.CTkFrame(controls_overlay, fg_color=COLORS['bg_tertiary'])
+        controls_inner = ctk.CTkFrame(controls_overlay, fg_color=COLORS['bg_primary'])
         controls_inner.pack(expand=True)
 
         # Previous button
-        ctk.CTkButton(
+        prev_button = ctk.CTkButton(
             controls_inner,
             text="◀",
             command=self._previous_clip,
@@ -286,12 +301,16 @@ class ReviewTab:
             height=50,
             corner_radius=25,
             font=ctk.CTkFont(size=20),
-            fg_color=COLORS['bg_secondary'],
-            border_color=COLORS['text_secondary'],
+            fg_color=COLORS['ui_button'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(side="left", padx=10)
+            text_color=COLORS['text_primary']
+        )
+        prev_button.pack(side="left", padx=10)
+
+        # Hover effects - only border glows
+        prev_button.bind("<Enter>", lambda e: prev_button.configure(border_color=COLORS['ui_border_hover']))
+        prev_button.bind("<Leave>", lambda e: prev_button.configure(border_color=COLORS['ui_border']))
 
         # Play/Pause button (larger, more prominent)
         self.play_pause_button = ctk.CTkButton(
@@ -302,16 +321,19 @@ class ReviewTab:
             height=60,
             corner_radius=30,
             font=ctk.CTkFont(size=24),
-            fg_color=COLORS['bg_secondary'],
-            border_color=COLORS['text_secondary'],
+            fg_color=COLORS['ui_button'],
+            border_color=COLORS['ui_border'],
             border_width=2,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_active_hover']
+            text_color=COLORS['text_primary']
         )
         self.play_pause_button.pack(side="left", padx=10)
 
+        # Hover effects - only border glows
+        self.play_pause_button.bind("<Enter>", lambda e: self.play_pause_button.configure(border_color=COLORS['ui_border_hover']))
+        self.play_pause_button.bind("<Leave>", lambda e: self.play_pause_button.configure(border_color=COLORS['ui_border']))
+
         # Next button
-        ctk.CTkButton(
+        next_button = ctk.CTkButton(
             controls_inner,
             text="▶",
             command=self._next_clip,
@@ -319,15 +341,19 @@ class ReviewTab:
             height=50,
             corner_radius=25,
             font=ctk.CTkFont(size=20),
-            fg_color=COLORS['bg_secondary'],
-            border_color=COLORS['text_secondary'],
+            fg_color=COLORS['ui_button'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(side="left", padx=10)
+            text_color=COLORS['text_primary']
+        )
+        next_button.pack(side="left", padx=10)
 
-        # Delete button (red accent)
-        ctk.CTkButton(
+        # Hover effects - only border glows
+        next_button.bind("<Enter>", lambda e: next_button.configure(border_color=COLORS['ui_border_hover']))
+        next_button.bind("<Leave>", lambda e: next_button.configure(border_color=COLORS['ui_border']))
+
+        # Delete button (danger accent border)
+        delete_button = ctk.CTkButton(
             controls_inner,
             text="🗑",
             command=self._delete_clip,
@@ -335,12 +361,16 @@ class ReviewTab:
             height=50,
             corner_radius=25,
             font=ctk.CTkFont(size=18),
-            fg_color=COLORS['bg_secondary'],
-            border_color=COLORS['accent_danger'],
+            fg_color=COLORS['ui_button'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_danger']
-        ).pack(side="left", padx=10)
+            text_color=COLORS['text_primary']
+        )
+        delete_button.pack(side="left", padx=10)
+
+        # Hover effects - border glows red to signal danger (destructive action)
+        delete_button.bind("<Enter>", lambda e: delete_button.configure(border_color=COLORS['accent_danger']))
+        delete_button.bind("<Leave>", lambda e: delete_button.configure(border_color=COLORS['ui_border']))
 
         # Progress bar (thin, elegant timeline scrubber)
         self.progress_bar = ctk.CTkProgressBar(
@@ -366,7 +396,7 @@ class ReviewTab:
         )
 
         # Compact info strip (single line with left/center/right sections)
-        info_strip = ctk.CTkFrame(right_frame, height=40, fg_color=COLORS['bg_secondary'])
+        info_strip = ctk.CTkFrame(right_frame, height=40, fg_color=COLORS['bg_primary'])
         info_strip.grid(row=3, column=0, sticky="ew")
         info_strip.grid_propagate(False)  # Maintain fixed height
 
@@ -426,10 +456,40 @@ class ReviewTab:
         root.bind("<h>", lambda e: self._show_shortcuts_help() if self._should_execute_shortcut() else None)
         root.bind("<H>", lambda e: self._show_shortcuts_help() if self._should_execute_shortcut() else None)
 
+    def _setup_macos_scrolling(self):
+        """Setup macOS trackpad scrolling with bind_all."""
+        import platform
+        if platform.system() != "Darwin":
+            return
+
+        try:
+            canvas = self.clip_list_frame._parent_canvas
+
+            def on_scroll(event):
+                # Check if mouse is over the clip list area
+                try:
+                    x, y = event.x_root, event.y_root
+                    widget = event.widget.winfo_containing(x, y)
+
+                    # Only scroll if mouse is over clip list frame or its children
+                    if widget and (widget == self.clip_list_frame or
+                                   str(widget).startswith(str(self.clip_list_frame))):
+                        canvas.yview_scroll(int(-1 * (event.delta)), "units")
+                        return "break"
+                except:
+                    pass
+
+            # Use bind_all to capture scroll events globally
+            root = self.parent.winfo_toplevel()
+            root.bind_all("<MouseWheel>", on_scroll, add="+")
+
+        except Exception as e:
+            print(f"macOS scrolling setup failed: {e}")
+
     def _update_speed(self, value):
-        """Update playback speed label and video player."""
+        """Update playback speed from settings panel."""
         speed = float(value)
-        self.speed_value_label.configure(text=f"{speed:.1f}x")
+        # Speed label is in settings panel, not review tab - no label to update here
         if self.player:
             self.player.set_speed(speed)
 
@@ -517,6 +577,31 @@ class ReviewTab:
             # Auto-play first clip
             self._play_clip(0)
 
+    def _format_animal_names(self, animals_raw: str) -> str:
+        """Format animal names for display.
+
+        Args:
+            animals_raw: Raw animal string like "deer&european_badger" or "cat"
+
+        Returns:
+            Formatted string like "Deer, European Badger" or "Cat"
+        """
+        if not animals_raw or animals_raw == 'none':
+            return "No animals"
+
+        # Split by ampersand (multiple animals)
+        animal_list = animals_raw.split('&')
+
+        # Format each animal name
+        formatted_animals = []
+        for animal in animal_list:
+            # Replace underscores with spaces and convert to Title Case
+            formatted = animal.replace('_', ' ').title()
+            formatted_animals.append(formatted)
+
+        # Join with comma-space
+        return ', '.join(formatted_animals)
+
     def _create_clip_button(self, idx: int, clip: Dict):
         """Create a clip item with consistent formatting."""
         # Create container frame for clip item
@@ -524,10 +609,24 @@ class ReviewTab:
             self.clip_list_frame,
             width=200,
             height=65,
-            fg_color=COLORS['ui_button']
+            fg_color=COLORS['ui_button'],
+            border_width=1,
+            border_color=COLORS['ui_border']
         )
         clip_frame.pack(pady=2, padx=5, fill="x")
         clip_frame.pack_propagate(False)  # Maintain fixed size
+
+        # Hover effects (only change border, not background)
+        def on_enter(event):
+            if self.current_index != idx:  # Don't override active state
+                clip_frame.configure(border_color=COLORS['ui_border_hover'])
+
+        def on_leave(event):
+            if self.current_index != idx:  # Don't override active state
+                clip_frame.configure(border_color=COLORS['ui_border'])
+
+        clip_frame.bind("<Enter>", on_enter)
+        clip_frame.bind("<Leave>", on_leave)
 
         # Make frame clickable
         clip_frame.bind("<Button-1>", lambda e, i=idx: self._play_clip(i))
@@ -543,7 +642,7 @@ class ReviewTab:
         title_label.bind("<Button-1>", lambda e, i=idx: self._play_clip(i))
 
         # Animals label (fixed font size, truncated consistently)
-        animals = clip['animals'].replace('&', ', ').replace('_', ', ')
+        animals = self._format_animal_names(clip['animals'])
         if len(animals) > 28:
             animals = animals[:25] + "..."
 
@@ -589,7 +688,7 @@ class ReviewTab:
             self.session_manager.save_state(self._get_preferences())
 
         # Update compact info strip (left/center/right sections)
-        animals_display = clip['animals'].replace('&', ' • ').replace('_', ', ')
+        animals_display = self._format_animal_names(clip['animals']).replace(',', ' •')
 
         self.info_filename_label.configure(text=f"🎬 {clip['title']}")
         self.info_animals_label.configure(text=animals_display if animals_display else "No animals detected")
@@ -599,11 +698,19 @@ class ReviewTab:
         for i, c in enumerate(self.clips):
             if 'frame_widget' in c and c['frame_widget'].winfo_exists():
                 if i == index:
-                    c['frame_widget'].configure(fg_color=COLORS['accent_active'])
+                    # Active state: neon teal border, black background
+                    c['frame_widget'].configure(
+                        fg_color=COLORS['ui_button'],
+                        border_color=COLORS['accent_active']
+                    )
                     # Scroll the highlighted clip into view
                     self._scroll_clip_into_view(c['frame_widget'])
                 else:
-                    c['frame_widget'].configure(fg_color=COLORS['ui_button'])
+                    # Inactive state: grey border, black background
+                    c['frame_widget'].configure(
+                        fg_color=COLORS['ui_button'],
+                        border_color=COLORS['ui_border']
+                    )
 
         # Reset progress bar
         self.progress_var.set(0.0)
@@ -977,6 +1084,8 @@ class ReviewTab:
         """Clear search and show all clips."""
         self.search_var.set("")
         self.match_count_label.configure(text="")
+        # Remove focus from search entry to restore keyboard shortcuts
+        self.parent.winfo_toplevel().focus()
         # Restore all clips
         for clip in self.clips:
             if 'frame_widget' in clip and clip['frame_widget'].winfo_exists():
@@ -986,6 +1095,8 @@ class ReviewTab:
         """Trigger search and jump to first match (called on Enter key)."""
         self._on_search_changed()  # Apply search filter first
         self._jump_to_first_match()  # Then jump to first match
+        # Remove focus from search entry to restore keyboard shortcuts
+        self.parent.winfo_toplevel().focus()
 
     def _jump_to_first_match(self, event=None):
         """Jump to and play first matching clip."""
@@ -1166,7 +1277,7 @@ class ReviewTab:
         button_frame.pack(fill="both", expand=True, padx=30)
 
         # Start Over
-        ctk.CTkButton(
+        start_over_btn = ctk.CTkButton(
             button_frame,
             text="Start Over",
             command=lambda: self._start_over(menu_modal),
@@ -1174,14 +1285,18 @@ class ReviewTab:
             height=40,
             font=ctk.CTkFont(**HEADING_FONT),
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['accent_danger'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_danger']
-        ).pack(pady=5)
+            text_color=COLORS['text_primary']
+        )
+        start_over_btn.pack(pady=5)
+
+        # Hover effects - border glows red to signal danger (destructive action)
+        start_over_btn.bind("<Enter>", lambda e: start_over_btn.configure(border_color=COLORS['accent_danger']))
+        start_over_btn.bind("<Leave>", lambda e: start_over_btn.configure(border_color=COLORS['ui_border']))
 
         # Open Output Folder
-        ctk.CTkButton(
+        output_btn = ctk.CTkButton(
             button_frame,
             text="Open Output Folder",
             command=lambda: self._open_output_folder(menu_modal),
@@ -1189,14 +1304,18 @@ class ReviewTab:
             height=40,
             font=ctk.CTkFont(**HEADING_FONT),
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(pady=5)
+            text_color=COLORS['text_primary']
+        )
+        output_btn.pack(pady=5)
+
+        # Hover effects - border glows neon teal
+        output_btn.bind("<Enter>", lambda e: output_btn.configure(border_color=COLORS['ui_border_hover']))
+        output_btn.bind("<Leave>", lambda e: output_btn.configure(border_color=COLORS['ui_border']))
 
         # About
-        ctk.CTkButton(
+        about_btn = ctk.CTkButton(
             button_frame,
             text="About",
             command=lambda: self._show_about(menu_modal),
@@ -1204,11 +1323,15 @@ class ReviewTab:
             height=40,
             font=ctk.CTkFont(**HEADING_FONT),
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(pady=5)
+            text_color=COLORS['text_primary']
+        )
+        about_btn.pack(pady=5)
+
+        # Hover effects - border glows neon teal
+        about_btn.bind("<Enter>", lambda e: about_btn.configure(border_color=COLORS['ui_border_hover']))
+        about_btn.bind("<Leave>", lambda e: about_btn.configure(border_color=COLORS['ui_border']))
 
         # Close instruction
         ctk.CTkLabel(
