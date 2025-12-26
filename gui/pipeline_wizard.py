@@ -12,7 +12,7 @@ from gui.config import (
 
 
 class PipelineWizard(ctk.CTkToplevel):
-    """Full-featured wizard for pipeline setup and execution."""
+    """Wizard for pipeline setup and execution."""
 
     def __init__(self, parent, session_manager, completion_callback):
         """Initialize pipeline wizard.

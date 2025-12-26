@@ -41,26 +41,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 python3 gui_app.py
 ```
 
-The AI model (~250MB) will download automatically on first run from HuggingFace.
-
-### Optional: Convenience Launcher
-
-**For macOS/Linux (launch.sh):**
-```bash
-#!/bin/bash
-cd "$(dirname "$0")"
-source venv/bin/activate
-python3 gui_app.py
-```
-Make it executable: `chmod +x launch.sh`
-
-**For Windows (launch.bat):**
-```batch
-@echo off
-cd /d "%~dp0"
-call venv\Scripts\activate
-python gui_app.py
-```
+The AI model (~210MB) will download automatically on first run from HuggingFace.
 
 ---
 
@@ -150,8 +131,6 @@ python3 review_clips.py \
 - `d` - delete (moves to Trash)
 - `q` - quit
 
-**Note:** The GUI app (`gui_app.py`) provides a superior experience and is recommended over this CLI tool.
-
 ---
 
 ### 5. `run_pipeline.py` - Orchestrator
@@ -194,6 +173,70 @@ python3 gui_app.py
 
 ---
 
+## Known Issues
+
+### 1. macOS Trackpad Scrolling (Clips List)
+**Status:** Unresolved
+
+**Issue:** Two-finger trackpad scrolling does not work in the clips list on macOS. Mouse wheel scrolling may work, but trackpad gestures are non-functional.
+
+**Attempted Fixes:**
+- Widget-specific `<MouseWheel>` event bindings
+- Recursive child widget binding
+- Global `bind_all()` event capture with mouse position detection
+- Multiple event types (MouseWheel, Button-4/5)
+- Delayed binding with `.after()`
+
+**Current Workaround:** Click and drag the scrollbar.
+
+---
+
+### 2. Search Functionality Issues
+**Status:** Unresolved
+
+**Issues:**
+- **Keyboard controls disabled during search:** After typing in the search box, keyboard shortcuts (n, p, space, etc.) do not work until the "Clear" button is pressed. Probably should add a modifier key to prevent confusion. 
+- **Next/Previous navigation ignores filter:** When clips are filtered by search, pressing the Next button navigates through the full unfiltered list instead of the search results
+
+**Current Workaround:**
+- Press the "Clear" button to restore keyboard controls
+- Manually select filtered clips from the clips list instead of using Next/Previous buttons
+
+---
+
+### 3. Application Packaging (py2app / PyInstaller)
+**Status:** Unresolved - Multiple blockers
+
+**Goal:** Create standalone `.app` bundle for distribution without requiring Python/venv installation.
+
+**Attempted Tools:**
+
+#### **py2app** (setup.py)
+- **Configuration:** `setup.py` with custom plist, icon, excludes/includes
+- **Blockers:**
+  - Recursion depth errors during dependency analysis (mitigated with `sys.setrecursionlimit(5000)`)
+  - PyTorch/Ultralytics dependency resolution failures
+  - CustomTkinter dynamic imports not detected
+  - Large bundle size due to PyTorch and dependency tree
+  - MPS (Apple Silicon) framework compatibility issues
+
+#### **PyInstaller** (TrailCam.spec)
+- **Configuration:** `TrailCam.spec` with Analysis, EXE, COLLECT, BUNDLE stages
+- **Blockers:**
+  - Hidden imports not detected (PIL, darkdetect, customtkinter internals)
+  - Binary dependency conflicts (cv2, torch, ultralytics)
+  - Runtime import errors even with manual hidden imports
+  - Code signing requirements for macOS distribution
+  - App crashes on launch with tkinter initialization errors
+
+**Packaging Challenges:**
+1. **Heavy ML dependencies:** PyTorch (~389MB) increases bundle size
+2. **Dynamic imports:** CustomTkinter and PIL use runtime imports that bundlers can't detect
+3. **Apple Silicon (MPS):** PyTorch MPS framework bindings difficult to bundle correctly
+4. **Subprocess architecture:** App spawns Python subprocesses for pipeline (run_pipeline.py) which expect a Python interpreter
+
+---
+
 ## Credits
 
 ### AI Model
@@ -226,9 +269,14 @@ trailcam_animal_id/
 ├── video_backend.py        # FastAPI backend for video streaming
 ├── gui/                    # GUI modules
 │   ├── main_window.py      # Main application window
-│   ├── pipeline_tab.py     # Pipeline configuration tab
-│   ├── pipeline_wizard.py  # New analysis wizard
+│   ├── pipeline_wizard.py  # Analysis wizard (directory selection, settings, execution)
 │   ├── review_tab.py       # Video review interface
+│   ├── video_player.py     # Video playback engine
+│   ├── video_client.py     # Backend communication
+│   ├── session_manager.py  # State persistence and session management
+│   ├── settings_panel.py   # Settings modal
+│   ├── shortcuts_help.py   # Keyboard shortcuts reference
+│   ├── cleanup_modal.py    # Pipeline output cleanup
 │   ├── process_runner.py   # Subprocess management
 │   └── config.py           # UI configuration
 ├── assets/                 # Icons and resources
