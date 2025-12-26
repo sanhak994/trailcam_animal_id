@@ -3,6 +3,7 @@
 import os
 import subprocess
 import threading
+from pathlib import Path
 from typing import List, Callable, Optional
 
 
@@ -49,6 +50,9 @@ class ProcessRunner:
         env = os.environ.copy()
         env['PYTHONUNBUFFERED'] = '1'
 
+        # Use project root as working directory
+        cwd = str(Path(__file__).parent.parent)
+
         try:
             self.process = subprocess.Popen(
                 command,
@@ -56,7 +60,8 @@ class ProcessRunner:
                 stderr=subprocess.STDOUT,  # Merge stderr into stdout
                 bufsize=1,
                 universal_newlines=True,
-                env=env
+                env=env,
+                cwd=cwd
             )
 
             # Read line by line

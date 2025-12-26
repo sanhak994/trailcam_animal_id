@@ -39,7 +39,7 @@ class PipelineTab:
         """Create all UI widgets for the pipeline tab."""
 
         # Input Configuration Frame
-        input_frame = ctk.CTkFrame(self.parent, fg_color=COLORS['bg_secondary'])
+        input_frame = ctk.CTkFrame(self.parent, fg_color=COLORS['bg_primary'])
         input_frame.pack(padx=20, pady=10, fill="x")
 
         # Title
@@ -63,17 +63,19 @@ class PipelineTab:
         )
         self.clips_entry.grid(row=1, column=1, padx=10, pady=5)
 
-        ctk.CTkButton(
+        clips_browse_btn = ctk.CTkButton(
             input_frame,
             text="Browse...",
             command=self._browse_clips,
             width=100,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).grid(row=1, column=2, padx=10, pady=5)
+            text_color=COLORS['text_primary']
+        )
+        clips_browse_btn.grid(row=1, column=2, padx=10, pady=5)
+        clips_browse_btn.bind("<Enter>", lambda e: clips_browse_btn.configure(border_color=COLORS['ui_border_hover']))
+        clips_browse_btn.bind("<Leave>", lambda e: clips_browse_btn.configure(border_color=COLORS['ui_border']))
 
         # Frames Directory
         ctk.CTkLabel(
@@ -89,17 +91,19 @@ class PipelineTab:
         )
         self.frames_entry.grid(row=2, column=1, padx=10, pady=5)
 
-        ctk.CTkButton(
+        frames_browse_btn = ctk.CTkButton(
             input_frame,
             text="Browse...",
             command=self._browse_frames,
             width=100,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).grid(row=2, column=2, padx=10, pady=5)
+            text_color=COLORS['text_primary']
+        )
+        frames_browse_btn.grid(row=2, column=2, padx=10, pady=5)
+        frames_browse_btn.bind("<Enter>", lambda e: frames_browse_btn.configure(border_color=COLORS['ui_border_hover']))
+        frames_browse_btn.bind("<Leave>", lambda e: frames_browse_btn.configure(border_color=COLORS['ui_border']))
 
         # Detection Directory
         ctk.CTkLabel(
@@ -115,17 +119,19 @@ class PipelineTab:
         )
         self.detection_entry.grid(row=3, column=1, padx=10, pady=5)
 
-        ctk.CTkButton(
+        detection_browse_btn = ctk.CTkButton(
             input_frame,
             text="Browse...",
             command=self._browse_detection,
             width=100,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).grid(row=3, column=2, padx=10, pady=5)
+            text_color=COLORS['text_primary']
+        )
+        detection_browse_btn.grid(row=3, column=2, padx=10, pady=5)
+        detection_browse_btn.bind("<Enter>", lambda e: detection_browse_btn.configure(border_color=COLORS['ui_border_hover']))
+        detection_browse_btn.bind("<Leave>", lambda e: detection_browse_btn.configure(border_color=COLORS['ui_border']))
 
         # Video Extensions
         ctk.CTkLabel(
@@ -178,12 +184,22 @@ class PipelineTab:
         ).grid(row=6, column=0, sticky="w", padx=10, pady=5)
 
         worker_options = get_worker_options()
+        frame_workers_border = ctk.CTkFrame(input_frame, fg_color=COLORS['ui_border'], corner_radius=6)
+        frame_workers_border.grid(row=6, column=1, sticky="w", padx=10, pady=5)
         ctk.CTkOptionMenu(
-            input_frame,
+            frame_workers_border,
             variable=self.frame_workers_var,
             values=[str(w) for w in worker_options],
-            width=200
-        ).grid(row=6, column=1, sticky="w", padx=10, pady=5)
+            width=198,
+            fg_color=COLORS['bg_primary'],
+            button_color=COLORS['ui_border'],
+            button_hover_color=COLORS['ui_border_hover'],
+            dropdown_fg_color=COLORS['bg_primary'],
+            dropdown_hover_color=COLORS['ui_border'],
+            text_color=COLORS['text_primary'],
+            dropdown_text_color=COLORS['text_primary'],
+            corner_radius=5
+        ).pack(padx=1, pady=1)
 
         # Classify Workers
         ctk.CTkLabel(
@@ -192,23 +208,39 @@ class PipelineTab:
             font=ctk.CTkFont(**BODY_FONT)
         ).grid(row=7, column=0, sticky="w", padx=10, pady=5)
 
+        classify_workers_border = ctk.CTkFrame(input_frame, fg_color=COLORS['ui_border'], corner_radius=6)
+        classify_workers_border.grid(row=7, column=1, sticky="w", padx=10, pady=5)
         ctk.CTkOptionMenu(
-            input_frame,
+            classify_workers_border,
             variable=self.classify_workers_var,
             values=[str(w) for w in worker_options],
-            width=200
-        ).grid(row=7, column=1, sticky="w", padx=10, pady=5)
+            width=198,
+            fg_color=COLORS['bg_primary'],
+            button_color=COLORS['ui_border'],
+            button_hover_color=COLORS['ui_border_hover'],
+            dropdown_fg_color=COLORS['bg_primary'],
+            dropdown_hover_color=COLORS['ui_border'],
+            text_color=COLORS['text_primary'],
+            dropdown_text_color=COLORS['text_primary'],
+            corner_radius=5
+        ).pack(padx=1, pady=1)
 
         # Force Checkbox
         ctk.CTkCheckBox(
             input_frame,
             text="Force re-run even if outputs exist",
             variable=self.force_var,
-            font=ctk.CTkFont(**BODY_FONT)
+            font=ctk.CTkFont(**BODY_FONT),
+            fg_color=COLORS['text_secondary'],
+            border_color=COLORS['text_secondary'],
+            border_width=1,
+            text_color=COLORS['text_primary'],
+            checkmark_color=COLORS['bg_primary'],
+            hover_color=COLORS['accent_neon']
         ).grid(row=8, column=0, columnspan=2, sticky="w", padx=10, pady=10)
 
         # Execution Frame
-        exec_frame = ctk.CTkFrame(self.parent, fg_color=COLORS['bg_secondary'])
+        exec_frame = ctk.CTkFrame(self.parent, fg_color=COLORS['bg_primary'])
         exec_frame.pack(padx=20, pady=10, fill="both", expand=True)
 
         # Title
@@ -230,12 +262,13 @@ class PipelineTab:
             height=40,
             font=ctk.CTkFont(**HEADING_FONT),
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_active_hover']
+            text_color=COLORS['text_primary']
         )
         self.run_button.pack(side="left", padx=5)
+        self.run_button.bind("<Enter>", lambda e: self.run_button.configure(border_color=COLORS['ui_border_hover']) if self.run_button.cget("state") == "normal" else None)
+        self.run_button.bind("<Leave>", lambda e: self.run_button.configure(border_color=COLORS['ui_border']) if self.run_button.cget("state") == "normal" else None)
 
         self.cancel_button = ctk.CTkButton(
             button_frame,
@@ -246,15 +279,21 @@ class PipelineTab:
             state="disabled",
             font=ctk.CTkFont(**HEADING_FONT),
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['accent_danger'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_danger']
+            text_color=COLORS['text_primary']
         )
         self.cancel_button.pack(side="left", padx=5)
+        self.cancel_button.bind("<Enter>", lambda e: self.cancel_button.configure(border_color=COLORS['accent_danger']) if self.cancel_button.cget("state") == "normal" else None)
+        self.cancel_button.bind("<Leave>", lambda e: self.cancel_button.configure(border_color=COLORS['ui_border']) if self.cancel_button.cget("state") == "normal" else None)
 
         # Progress Bar
-        self.progress_bar = ctk.CTkProgressBar(exec_frame, width=940)
+        self.progress_bar = ctk.CTkProgressBar(
+            exec_frame,
+            width=940,
+            fg_color=COLORS['bg_tertiary'],
+            progress_color=COLORS['accent_neon']
+        )
         self.progress_bar.pack(padx=10, pady=10, fill="x")
         self.progress_bar.set(0)
 
@@ -313,6 +352,13 @@ class PipelineTab:
         self.frames_dir_var.set(str(clips_path / ".pipeline_output" / "frames"))
         self.detection_dir_var.set(str(clips_path / ".pipeline_output" / "detection_csvs"))
 
+    # Pipeline stage weights for overall progress tracking
+    PIPELINE_STAGES = {
+        "Extracting frames": {"weight": 0.40, "range": (0.0, 0.40)},      # 0-40%
+        "Classifying frames": {"weight": 0.50, "range": (0.40, 0.90)},   # 40-90%
+        "Wrote": {"weight": 0.10, "range": (0.90, 1.0)},                 # 90-100%
+    }
+
     def _append_log(self, text: str):
         """Thread-safe log append."""
         self.log_text.after(0, lambda: self._append_log_sync(text))
@@ -323,9 +369,47 @@ class PipelineTab:
         self.log_text.see("end")
 
     def _update_progress(self, line: str):
-        """Parse line for progress information (basic implementation)."""
-        # TODO: Implement progress parsing in Phase 2
-        pass
+        """Parse tqdm progress and scale to overall pipeline progress."""
+        import re
+
+        # Detect current stage from output line
+        current_stage = None
+        for stage_name in self.PIPELINE_STAGES:
+            if stage_name in line:
+                current_stage = stage_name
+                break
+
+        if not current_stage:
+            return
+
+        # Parse progress within current stage (0.0 to 1.0)
+        stage_progress = 0.0
+
+        # Try percentage match
+        pct_match = re.search(r'(\d+)%', line)
+        if pct_match:
+            stage_progress = int(pct_match.group(1)) / 100.0
+        else:
+            # Try fraction match
+            frac_match = re.search(r'(\d+)/(\d+)', line)
+            if frac_match:
+                current = int(frac_match.group(1))
+                total = int(frac_match.group(2))
+                if total > 0:
+                    stage_progress = current / total
+
+        # Scale to overall pipeline progress
+        stage_info = self.PIPELINE_STAGES[current_stage]
+        range_start, range_end = stage_info["range"]
+        overall_progress = range_start + (stage_progress * (range_end - range_start))
+
+        # Update progress bar and step label
+        self._set_progress_safe(overall_progress)
+        self.step_label.configure(text=f"{current_stage}... {int(stage_progress * 100)}%")
+
+    def _set_progress_safe(self, value: float):
+        """Thread-safe progress bar update."""
+        self.progress_bar.after(0, lambda: self.progress_bar.set(value))
 
     def _on_completion(self, return_code: int):
         """Handle pipeline completion."""
@@ -368,6 +452,10 @@ class PipelineTab:
         cmd = [
             sys.executable,
             "run_pipeline.py",
+        ]
+
+        # Add arguments
+        cmd.extend([
             "--clips_dir", self.clips_dir_var.get(),
             "--frames_dir", self.frames_dir_var.get(),
             "--detection_dir", self.detection_dir_var.get(),
@@ -375,7 +463,7 @@ class PipelineTab:
             "--frames_workers", str(self.frame_workers_var.get()),
             "--classify_workers", str(self.classify_workers_var.get()),
             "--exts", self.extensions_var.get(),
-        ]
+        ])
 
         if self.force_var.get():
             cmd.append("--force")

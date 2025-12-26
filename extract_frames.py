@@ -96,8 +96,12 @@ def main():
             executor.submit(extract_even_frames, video, args.frames_per_clip, output_dir)
             for video in videos
         ]
-        for _ in tqdm(futures.as_completed(futures_list), total=len(futures_list), desc="Extracting frames"):
-            pass
+
+        # Use tqdm as context manager to ensure proper cleanup
+        with tqdm(total=len(futures_list), desc="Extracting frames") as pbar:
+            for future in futures.as_completed(futures_list):
+                future.result()  # Properly consume future and propagate exceptions
+                pbar.update(1)
 
     print(f"Extracted frames for {len(videos)} clips into {output_dir}")
 

@@ -24,3 +24,9 @@ build/
 *.egg-info/
 .gitattributes
 CLAUDE.md
+.claude
+assets/Trapper*
+.cache
+.gemini*
+plans
+docs

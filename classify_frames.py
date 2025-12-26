@@ -5,6 +5,7 @@ import argparse
 import concurrent.futures as futures
 import csv
 import os
+import sys
 import threading
 from pathlib import Path
 from typing import List, Sequence, Tuple
@@ -52,9 +53,21 @@ def normalize_label(raw_label: str) -> str:
 
 
 def ensure_model_path() -> str:
+    """Find the model file, looking in the bundle if packaged."""
+    # If running in a packaged app (frozen), the model is in the temp dir
+    if getattr(sys, 'frozen', False):
+        # sys._MEIPASS is the path to the temp folder created by PyInstaller
+        base_path = sys._MEIPASS
+        model_path = Path(base_path) / MODEL_FILENAME
+        if model_path.exists():
+            return str(model_path)
+
+    # For development or as a fallback, check current dir
     local_path = Path(MODEL_FILENAME)
     if local_path.exists():
         return str(local_path)
+
+    # Finally, for developers, download it if not found locally
     return hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILENAME)
 
 
@@ -142,8 +155,12 @@ def main():
     rows: List[Tuple[str, str, bool]] = []
     with futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
         future_map = {executor.submit(predict_frame, frame, device): frame for frame in frames}
-        for future in tqdm(futures.as_completed(future_map), total=len(future_map), desc="Classifying frames"):
-            rows.append(future.result())
+
+        # Use tqdm as context manager to ensure proper cleanup
+        with tqdm(total=len(future_map), desc="Classifying frames") as pbar:
+            for future in futures.as_completed(future_map):
+                rows.append(future.result())  # Properly consume future
+                pbar.update(1)
 
     out_path = output_dir/"animal_predictions.csv"
     with out_path.open("w", newline="") as f:

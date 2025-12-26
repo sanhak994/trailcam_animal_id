@@ -4,7 +4,7 @@ import time
 import threading
 from pathlib import Path
 from typing import Callable, Optional
-import cv2
+from gui import video_client
 import customtkinter as ctk
 from PIL import Image
 
@@ -24,7 +24,7 @@ class VideoPlayer:
         self.completion_callback = completion_callback
         self.progress_callback = progress_callback
 
-        self.cap: Optional[cv2.VideoCapture] = None
+        self.cap: Optional[video_client.VideoCapture] = None
         self.thread: Optional[threading.Thread] = None
         self.running = False
         self.paused = False
@@ -83,17 +83,17 @@ class VideoPlayer:
             self.stop()
 
         # Open video file
-        self.cap = cv2.VideoCapture(str(path))
+        self.cap = video_client.VideoCapture(str(path))
         if not self.cap.isOpened():
             raise ValueError(f"Could not open video: {path}")
 
         # Get original video dimensions
-        orig_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        orig_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        orig_width = int(self.cap.get(video_client.VideoCapture.CAP_PROP_FRAME_WIDTH))
+        orig_height = int(self.cap.get(video_client.VideoCapture.CAP_PROP_FRAME_HEIGHT))
         self.video_size = (orig_width, orig_height)
 
         # Get total frame count
-        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.total_frames = int(self.cap.get(video_client.VideoCapture.CAP_PROP_FRAME_COUNT))
 
         # Calculate display size maintaining aspect ratio
         self._calculate_display_size()
@@ -144,7 +144,7 @@ class VideoPlayer:
             return
 
         # Get video properties
-        fps = self.cap.get(cv2.CAP_PROP_FPS) or 24.0
+        fps = self.cap.get(video_client.VideoCapture.CAP_PROP_FPS) or 24.0
         frame_delay = 1.0 / fps  # seconds per frame
         current_frame = 0
 
@@ -161,6 +161,10 @@ class VideoPlayer:
             # Calculate frame timing
             start_time = time.time()
 
+            # Check if cap is still valid (might be None if stop() was called)
+            if not self.cap:
+                break
+
             # Read frame
             ret, frame = self.cap.read()
             if not ret:
@@ -175,6 +179,9 @@ class VideoPlayer:
 
             # Skip additional frames to speed up playback
             for _ in range(frame_step - 1):
+                # Check if cap is still valid before grabbing
+                if not self.cap:
+                    return
                 if not self.cap.grab():
                     # Video ended while skipping
                     self.running = False
@@ -189,11 +196,11 @@ class VideoPlayer:
                 progress = min(1.0, current_frame / self.total_frames)
                 self.progress_callback(progress)
 
-            # Convert BGR to RGB
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Frame is already in RGB format from video_client
+            # (unlike cv2 which returns BGR)
 
             # Convert to PIL Image
-            pil_image = Image.fromarray(frame_rgb)
+            pil_image = Image.fromarray(frame)
 
             # Resize to display size maintaining aspect ratio
             pil_image = pil_image.resize(self.display_size, Image.Resampling.LANCZOS)

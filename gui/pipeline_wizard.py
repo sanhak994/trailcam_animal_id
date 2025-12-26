@@ -12,7 +12,7 @@ from gui.config import (
 
 
 class PipelineWizard(ctk.CTkToplevel):
-    """Full-featured wizard for pipeline setup and execution."""
+    """Wizard for pipeline setup and execution."""
 
     def __init__(self, parent, session_manager, completion_callback):
         """Initialize pipeline wizard.
@@ -40,7 +40,7 @@ class PipelineWizard(ctk.CTkToplevel):
         self.force_var = ctk.BooleanVar(value=DEFAULT_CONFIG['force'])
 
         # Window configuration
-        self.title("New Analysis Wizard")
+        self.title("Analysis Wizard")
         self.geometry("900x700")
         self.configure(fg_color=COLORS['bg_primary'])
 
@@ -83,7 +83,7 @@ class PipelineWizard(ctk.CTkToplevel):
         ).pack(pady=(0, 20))
 
         # Directory selection
-        dir_frame = ctk.CTkFrame(self.container, fg_color=COLORS['bg_secondary'])
+        dir_frame = ctk.CTkFrame(self.container, fg_color=COLORS['bg_primary'])
         dir_frame.pack(fill="x", pady=10)
 
         ctk.CTkLabel(
@@ -99,17 +99,19 @@ class PipelineWizard(ctk.CTkToplevel):
         )
         self.clips_entry.grid(row=0, column=1, padx=10, pady=10)
 
-        ctk.CTkButton(
+        browse_btn = ctk.CTkButton(
             dir_frame,
             text="Browse...",
             command=self._browse_clips,
             width=100,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).grid(row=0, column=2, padx=10, pady=10)
+            text_color=COLORS['text_primary']
+        )
+        browse_btn.grid(row=0, column=2, padx=10, pady=10)
+        browse_btn.bind("<Enter>", lambda e: browse_btn.configure(border_color=COLORS['ui_border_hover']))
+        browse_btn.bind("<Leave>", lambda e: browse_btn.configure(border_color=COLORS['ui_border']))
 
         # Status area
         self.step1_status = ctk.CTkLabel(
@@ -126,17 +128,19 @@ class PipelineWizard(ctk.CTkToplevel):
         nav_frame = ctk.CTkFrame(self.container, fg_color=COLORS['bg_primary'])
         nav_frame.pack(side="bottom", pady=20)
 
-        ctk.CTkButton(
+        cancel_btn = ctk.CTkButton(
             nav_frame,
             text="Cancel",
             command=self.destroy,
             width=150,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(side="left", padx=5)
+            text_color=COLORS['text_primary']
+        )
+        cancel_btn.pack(side="left", padx=5)
+        cancel_btn.bind("<Enter>", lambda e: cancel_btn.configure(border_color=COLORS['accent_danger']))
+        cancel_btn.bind("<Leave>", lambda e: cancel_btn.configure(border_color=COLORS['ui_border']))
 
         self.step1_continue_btn = ctk.CTkButton(
             nav_frame,
@@ -144,13 +148,14 @@ class PipelineWizard(ctk.CTkToplevel):
             command=self._step1_continue,
             width=150,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
             text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_active_hover'],
             state="disabled"
         )
         self.step1_continue_btn.pack(side="left", padx=5)
+        self.step1_continue_btn.bind("<Enter>", lambda e: self.step1_continue_btn.configure(border_color=COLORS['ui_border_hover']) if self.step1_continue_btn.cget("state") == "normal" else None)
+        self.step1_continue_btn.bind("<Leave>", lambda e: self.step1_continue_btn.configure(border_color=COLORS['ui_border']) if self.step1_continue_btn.cget("state") == "normal" else None)
 
         # If default directory exists, validate it
         if Path(DEFAULT_CONFIG['clips_dir']).exists():
@@ -258,7 +263,7 @@ class PipelineWizard(ctk.CTkToplevel):
         # Settings frame with scroll
         settings_scroll = ctk.CTkScrollableFrame(
             self.container,
-            fg_color=COLORS['bg_secondary'],
+            fg_color=COLORS['bg_primary'],
             height=400
         )
         settings_scroll.pack(fill="both", expand=True, pady=10)
@@ -270,41 +275,47 @@ class PipelineWizard(ctk.CTkToplevel):
         nav_frame = ctk.CTkFrame(self.container, fg_color=COLORS['bg_primary'])
         nav_frame.pack(side="bottom", pady=20)
 
-        ctk.CTkButton(
+        back_btn = ctk.CTkButton(
             nav_frame,
             text="< Back",
             command=self._show_step1_directory,
             width=150,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['ui_button_hover']
-        ).pack(side="left", padx=5)
+            text_color=COLORS['text_primary']
+        )
+        back_btn.pack(side="left", padx=5)
+        back_btn.bind("<Enter>", lambda e: back_btn.configure(border_color=COLORS['ui_border_hover']))
+        back_btn.bind("<Leave>", lambda e: back_btn.configure(border_color=COLORS['ui_border']))
 
-        ctk.CTkButton(
+        defaults_btn = ctk.CTkButton(
             nav_frame,
             text="Use Defaults",
             command=self._show_step3_run,
             width=150,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_active_hover']
-        ).pack(side="left", padx=5)
+            text_color=COLORS['text_primary']
+        )
+        defaults_btn.pack(side="left", padx=5)
+        defaults_btn.bind("<Enter>", lambda e: defaults_btn.configure(border_color=COLORS['ui_border_hover']))
+        defaults_btn.bind("<Leave>", lambda e: defaults_btn.configure(border_color=COLORS['ui_border']))
 
-        ctk.CTkButton(
+        run_btn = ctk.CTkButton(
             nav_frame,
             text="Run Analysis",
             command=self._show_step3_run,
             width=150,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['text_secondary'],
+            border_color=COLORS['ui_border'],
             border_width=1,
-            text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_active_hover']
-        ).pack(side="left", padx=5)
+            text_color=COLORS['text_primary']
+        )
+        run_btn.pack(side="left", padx=5)
+        run_btn.bind("<Enter>", lambda e: run_btn.configure(border_color=COLORS['ui_border_hover']))
+        run_btn.bind("<Leave>", lambda e: run_btn.configure(border_color=COLORS['ui_border']))
 
     def _create_pipeline_settings(self, parent):
         """Create pipeline settings widgets.
@@ -357,12 +368,22 @@ class PipelineWizard(ctk.CTkToplevel):
         ).pack(side="left", padx=10)
 
         worker_options = get_worker_options()
+        frame_workers_border = ctk.CTkFrame(worker_frame, fg_color=COLORS['ui_border'], corner_radius=6)
+        frame_workers_border.pack(side="left", padx=10)
         ctk.CTkOptionMenu(
-            worker_frame,
+            frame_workers_border,
             variable=self.frame_workers_var,
             values=[str(w) for w in worker_options],
-            width=100
-        ).pack(side="left", padx=10)
+            width=98,
+            fg_color=COLORS['bg_primary'],
+            button_color=COLORS['ui_border'],
+            button_hover_color=COLORS['ui_border_hover'],
+            dropdown_fg_color=COLORS['bg_primary'],
+            dropdown_hover_color=COLORS['ui_border'],
+            text_color=COLORS['text_primary'],
+            dropdown_text_color=COLORS['text_primary'],
+            corner_radius=5
+        ).pack(padx=1, pady=1)
 
         ctk.CTkLabel(
             worker_frame,
@@ -370,12 +391,22 @@ class PipelineWizard(ctk.CTkToplevel):
             font=ctk.CTkFont(**BODY_FONT)
         ).pack(side="left", padx=20)
 
+        classify_workers_border = ctk.CTkFrame(worker_frame, fg_color=COLORS['ui_border'], corner_radius=6)
+        classify_workers_border.pack(side="left", padx=10)
         ctk.CTkOptionMenu(
-            worker_frame,
+            classify_workers_border,
             variable=self.classify_workers_var,
             values=[str(w) for w in worker_options],
-            width=100
-        ).pack(side="left", padx=10)
+            width=98,
+            fg_color=COLORS['bg_primary'],
+            button_color=COLORS['ui_border'],
+            button_hover_color=COLORS['ui_border_hover'],
+            dropdown_fg_color=COLORS['bg_primary'],
+            dropdown_hover_color=COLORS['ui_border'],
+            text_color=COLORS['text_primary'],
+            dropdown_text_color=COLORS['text_primary'],
+            corner_radius=5
+        ).pack(padx=1, pady=1)
 
         # Force checkbox
         ctk.CTkCheckBox(
@@ -387,7 +418,8 @@ class PipelineWizard(ctk.CTkToplevel):
             border_color=COLORS['text_secondary'],
             border_width=1,
             text_color=COLORS['text_primary'],
-            checkmark_color=COLORS['bg_primary']
+            checkmark_color=COLORS['bg_primary'],
+            hover_color=COLORS['accent_neon']
         ).pack(padx=10, pady=10, anchor="w")
 
     def _show_step3_run(self):
@@ -404,7 +436,12 @@ class PipelineWizard(ctk.CTkToplevel):
         ).pack(pady=(0, 10))
 
         # Progress bar
-        self.progress_bar = ctk.CTkProgressBar(self.container, width=800)
+        self.progress_bar = ctk.CTkProgressBar(
+            self.container,
+            width=800,
+            fg_color=COLORS['bg_tertiary'],
+            progress_color=COLORS['accent_neon']
+        )
         self.progress_bar.pack(padx=10, pady=10)
         self.progress_bar.set(0)
 
@@ -438,13 +475,14 @@ class PipelineWizard(ctk.CTkToplevel):
             command=self._cancel_pipeline,
             width=150,
             fg_color=COLORS['bg_primary'],
-            border_color=COLORS['accent_danger'],
+            border_color=COLORS['ui_border'],
             border_width=1,
             text_color=COLORS['text_primary'],
-            hover_color=COLORS['accent_danger'],
             state="disabled"
         )
         self.cancel_run_btn.pack(side="left", padx=5)
+        self.cancel_run_btn.bind("<Enter>", lambda e: self.cancel_run_btn.configure(border_color=COLORS['accent_danger']) if self.cancel_run_btn.cget("state") == "normal" else None)
+        self.cancel_run_btn.bind("<Leave>", lambda e: self.cancel_run_btn.configure(border_color=COLORS['ui_border']) if self.cancel_run_btn.cget("state") == "normal" else None)
 
         # Start pipeline immediately
         self._run_pipeline()
@@ -472,6 +510,10 @@ class PipelineWizard(ctk.CTkToplevel):
         cmd = [
             sys.executable,
             "run_pipeline.py",
+        ]
+
+        # Add arguments
+        cmd.extend([
             "--clips_dir", self.clips_dir_var.get(),
             "--frames_dir", self.frames_dir_var.get(),
             "--detection_dir", self.detection_dir_var.get(),
@@ -479,7 +521,7 @@ class PipelineWizard(ctk.CTkToplevel):
             "--frames_workers", str(self.frame_workers_var.get()),
             "--classify_workers", str(self.classify_workers_var.get()),
             "--exts", self.extensions_var.get(),
-        ]
+        ])
 
         if self.force_var.get():
             cmd.append("--force")
@@ -491,15 +533,65 @@ class PipelineWizard(ctk.CTkToplevel):
         # Run pipeline
         self.runner = ProcessRunner(
             log_callback=self._append_log,
-            progress_callback=lambda x: None,
+            progress_callback=self._update_progress,
             completion_callback=self._on_pipeline_complete
         )
         self.runner.run(cmd)
+
+    # Pipeline stage weights for overall progress tracking
+    PIPELINE_STAGES = {
+        "Extracting frames": {"weight": 0.40, "range": (0.0, 0.40)},      # 0-40%
+        "Classifying frames": {"weight": 0.50, "range": (0.40, 0.90)},   # 40-90%
+        "Wrote": {"weight": 0.10, "range": (0.90, 1.0)},                 # 90-100%
+    }
 
     def _append_log(self, text: str):
         """Append text to log."""
         self.log_text.insert("end", text + "\n")
         self.log_text.see("end")
+
+    def _update_progress(self, line: str):
+        """Parse tqdm progress and scale to overall pipeline progress."""
+        import re
+
+        # Detect current stage from output line
+        current_stage = None
+        for stage_name in self.PIPELINE_STAGES:
+            if stage_name in line:
+                current_stage = stage_name
+                break
+
+        if not current_stage:
+            return
+
+        # Parse progress within current stage (0.0 to 1.0)
+        stage_progress = 0.0
+
+        # Try percentage match
+        pct_match = re.search(r'(\d+)%', line)
+        if pct_match:
+            stage_progress = int(pct_match.group(1)) / 100.0
+        else:
+            # Try fraction match
+            frac_match = re.search(r'(\d+)/(\d+)', line)
+            if frac_match:
+                current = int(frac_match.group(1))
+                total = int(frac_match.group(2))
+                if total > 0:
+                    stage_progress = current / total
+
+        # Scale to overall pipeline progress
+        stage_info = self.PIPELINE_STAGES[current_stage]
+        range_start, range_end = stage_info["range"]
+        overall_progress = range_start + (stage_progress * (range_end - range_start))
+
+        # Update progress bar and step label
+        self._set_progress_safe(overall_progress)
+        self.run_status_label.configure(text=f"{current_stage}... {int(stage_progress * 100)}%")
+
+    def _set_progress_safe(self, value: float):
+        """Thread-safe progress bar update."""
+        self.progress_bar.after(0, lambda: self.progress_bar.set(value))
 
     def _cancel_pipeline(self):
         """Cancel running pipeline."""

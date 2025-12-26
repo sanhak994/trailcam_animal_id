@@ -43,7 +43,7 @@ class TrailCamApp(ctk.CTk):
             text="Ready",
             anchor="w",
             height=30,
-            fg_color=COLORS['bg_secondary'],
+            fg_color=COLORS['bg_primary'],
             text_color=COLORS['text_secondary']
         )
         self.status_label.pack(side="bottom", fill="x", padx=10, pady=(0, 5))
@@ -97,7 +97,7 @@ class TrailCamApp(ctk.CTk):
             ).pack(pady=(0, 20))
 
             # Resume button (large, primary)
-            ctk.CTkButton(
+            resume_btn = ctk.CTkButton(
                 startup_container,
                 text="Resume Review",
                 command=self._resume_review,
@@ -105,14 +105,18 @@ class TrailCamApp(ctk.CTk):
                 height=60,
                 font=ctk.CTkFont(**HEADING_FONT),
                 fg_color=COLORS['bg_primary'],
-                border_color=COLORS['text_secondary'],
+                border_color=COLORS['ui_border'],
                 border_width=2,
-                text_color=COLORS['text_primary'],
-                hover_color=COLORS['accent_active_hover']
-            ).pack(pady=10)
+                text_color=COLORS['text_primary']
+            )
+            resume_btn.pack(pady=10)
+
+            # Hover effects - border only
+            resume_btn.bind("<Enter>", lambda e: resume_btn.configure(border_color=COLORS['ui_border_hover']))
+            resume_btn.bind("<Leave>", lambda e: resume_btn.configure(border_color=COLORS['ui_border']))
 
             # New Analysis button (smaller, secondary)
-            ctk.CTkButton(
+            new_analysis_btn = ctk.CTkButton(
                 startup_container,
                 text="Start New Analysis",
                 command=self._start_new_analysis,
@@ -120,11 +124,15 @@ class TrailCamApp(ctk.CTk):
                 height=40,
                 font=ctk.CTkFont(**BODY_FONT),
                 fg_color=COLORS['bg_primary'],
-                border_color=COLORS['text_secondary'],
+                border_color=COLORS['ui_border'],
                 border_width=1,
-                text_color=COLORS['text_primary'],
-                hover_color=COLORS['ui_button_hover']
-            ).pack(pady=10)
+                text_color=COLORS['text_primary']
+            )
+            new_analysis_btn.pack(pady=10)
+
+            # Hover effects - border only
+            new_analysis_btn.bind("<Enter>", lambda e: new_analysis_btn.configure(border_color=COLORS['ui_border_hover']))
+            new_analysis_btn.bind("<Leave>", lambda e: new_analysis_btn.configure(border_color=COLORS['ui_border']))
 
         else:
             # Show New Analysis option (primary)
@@ -136,7 +144,7 @@ class TrailCamApp(ctk.CTk):
             ).pack(pady=(0, 20))
 
             # New Analysis button (large, primary)
-            ctk.CTkButton(
+            new_analysis_primary_btn = ctk.CTkButton(
                 startup_container,
                 text="Start New Analysis",
                 command=self._start_new_analysis,
@@ -144,11 +152,15 @@ class TrailCamApp(ctk.CTk):
                 height=60,
                 font=ctk.CTkFont(**HEADING_FONT),
                 fg_color=COLORS['bg_primary'],
-                border_color=COLORS['text_secondary'],
+                border_color=COLORS['ui_border'],
                 border_width=2,
-                text_color=COLORS['text_primary'],
-                hover_color=COLORS['accent_active_hover']
-            ).pack(pady=10)
+                text_color=COLORS['text_primary']
+            )
+            new_analysis_primary_btn.pack(pady=10)
+
+            # Hover effects - border only
+            new_analysis_primary_btn.bind("<Enter>", lambda e: new_analysis_primary_btn.configure(border_color=COLORS['ui_border_hover']))
+            new_analysis_primary_btn.bind("<Leave>", lambda e: new_analysis_primary_btn.configure(border_color=COLORS['ui_border']))
 
     def _start_new_analysis(self):
         """Show pipeline wizard for new analysis."""
